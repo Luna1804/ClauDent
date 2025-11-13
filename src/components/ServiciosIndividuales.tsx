@@ -1,4 +1,4 @@
-// (NUEVO ARCHIVO) src/components/ServiciosIndividuales.tsx
+// (Archivo MODIFICADO) src/components/ServiciosIndividuales.tsx
 import React, { useState, useMemo } from 'react';
 import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { useApp } from '@/state/AppContext';
@@ -275,10 +275,12 @@ const ServiciosIndividuales: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="precio">Precio (CLP) *</Label>
+                  {/* --- ¡CORREGIDO! --- */}
                   <Input
                     id="precio"
                     type="number"
                     min="0"
+                    step="0.01" // <-- AÑADIDO
                     value={formData.precio}
                     onChange={(e) => setFormData({ ...formData, precio: parseFloat(e.target.value) || 0 })}
                     required

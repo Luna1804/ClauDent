@@ -28,11 +28,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
-// ¡NUEVO! Importamos el generador de PDF
 import { generateQuotationPDF } from '@/lib/pdfGenerator'; 
 
 const Cotizaciones: React.FC = () => {
-  // Leemos 'patients' y 'services' para pasarlos al generador de PDF
   const { quotations, quotationsLoading, patients, services, addQuotation } = useApp();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -145,22 +143,15 @@ const Cotizaciones: React.FC = () => {
     }
   };
 
-  // ¡MODIFICADO! Esta función ahora genera un PDF real
   const handleExportPDF = (quotationId: string) => {
-    // 1. Encontrar la cotización completa
     const quotation = quotations.find(q => q.id === quotationId);
     if (!quotation) {
       toast.error("No se encontró la cotización.");
       return;
     }
-
-    // 2. Encontrar los datos del paciente
     const patient = patients.find(p => p.id === quotation.pacienteId);
-
-    // 3. Llamar al generador
     try {
       generateQuotationPDF(quotation, patient);
-      // El toast de éxito ya no es necesario, el generador se encarga
     } catch (error) {
       console.error("Error al generar PDF: ", error);
       toast.error("Error al generar el PDF");
@@ -212,7 +203,6 @@ const Cotizaciones: React.FC = () => {
         </Button>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {(['borrador', 'enviada', 'aceptada', 'rechazada'] as const).map((estado) => {
           const count = quotations.filter((q) => q.estado === estado).length;
@@ -231,7 +221,6 @@ const Cotizaciones: React.FC = () => {
         })}
       </div>
 
-      {/* Table */}
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -263,7 +252,7 @@ const Cotizaciones: React.FC = () => {
                       <TableRow key={quotation.id}>
                         <TableCell className="font-mono text-sm">#{quotation.id.substring(0, 6)}...</TableCell>
                         <TableCell>
-                          {patient ? `${patient.nombre} ${patient.apellido}` : 'Paciente eliminado'}
+                          {patient ? `${patient.nombres} ${patient.apellidos}` : 'Paciente eliminado'}
                         </TableCell>
                         <TableCell>{formatDate(quotation.fecha)}</TableCell>
                         <TableCell>{quotation.items.length} servicio(s)</TableCell>
@@ -298,7 +287,6 @@ const Cotizaciones: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -317,7 +305,7 @@ const Cotizaciones: React.FC = () => {
                     <SelectContent>
                       {patients.map((patient) => (
                         <SelectItem key={patient.id} value={patient.id}>
-                          {patient.nombre} {patient.apellido} - {patient.rut}
+                          {patient.nombres} {patient.apellidos} - {patient.curp || 'N/A'}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -375,9 +363,11 @@ const Cotizaciones: React.FC = () => {
                           placeholder="Nombre servicio personalizado"
                           className="flex-1"
                         />
+                        {/* --- ¡CORREGIDO! --- */}
                         <Input
                           type="number"
                           min="0"
+                          step="0.01" // <-- AÑADIDO
                           value={item.precioUnitario}
                           onChange={(e) => handleItemChange(index, 'precioUnitario', parseFloat(e.target.value) || 0)}
                           className="w-32"
@@ -385,16 +375,18 @@ const Cotizaciones: React.FC = () => {
                         />
                       </>
                     )}
+                    {/* --- ¡CORREGIDO! --- */}
                     <Input
                       type="number"
-                      min="1"
+                      min="0.01" // <-- MODIFICADO
+                      step="0.01" // <-- AÑADIDO
                       value={item.cantidad}
-                      onChange={(e) => handleItemChange(index, 'cantidad', parseInt(e.target.value) || 1)}
+                      onChange={(e) => handleItemChange(index, 'cantidad', parseFloat(e.target.value) || 0)}
                       className="w-24"
                       placeholder="Cant."
                     />
                     <Button className="h-4 w-4"  type="button" variant="destructive" size="icon" onClick={() => handleRemoveItem(index)}>
-                      X 
+                      X
                     </Button>
                   </div>
                 ))}

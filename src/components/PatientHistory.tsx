@@ -11,21 +11,19 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-// ¡NUEVO! Importaciones de Firebase
+// Importaciones de Firebase
 import { collection, query, onSnapshot, orderBy, QuerySnapshot, DocumentData } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { HistoryEntry } from '@/state/AppContext'; // Importamos el tipo
-import { Skeleton } from '@/components/ui/skeleton'; // Importamos Skeleton
+import { HistoryEntry } from '@/state/AppContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface PatientHistoryProps {
   patientId: string;
 }
 
 const PatientHistory: React.FC<PatientHistoryProps> = ({ patientId }) => {
-  // 'services' y 'addHistoryEntry' vienen del context
   const { services, addHistoryEntry } = useApp();
   
-  // ¡NUEVO! Estado local para el historial y la carga
   const [historial, setHistorial] = useState<HistoryEntry[]>([]);
   const [historialLoading, setHistorialLoading] = useState(true);
   
@@ -37,14 +35,11 @@ const PatientHistory: React.FC<PatientHistoryProps> = ({ patientId }) => {
     notas: '',
   });
 
-  // ¡NUEVO! Efecto para cargar el historial del paciente
   useEffect(() => {
     if (!patientId) return;
 
     setHistorialLoading(true);
-    // Creamos la referencia a la sub-colección
     const historyRef = collection(db, 'pacientes', patientId, 'historial');
-    // Creamos una consulta para ordenar por fecha descendente
     const q = query(historyRef, orderBy('fecha', 'desc'));
 
     const unsubscribe = onSnapshot(q, (querySnapshot: QuerySnapshot<DocumentData>) => {
@@ -56,9 +51,8 @@ const PatientHistory: React.FC<PatientHistoryProps> = ({ patientId }) => {
       setHistorialLoading(false);
     });
 
-    // Limpiamos la suscripción al desmontar
     return () => unsubscribe();
-  }, [patientId]); // Se ejecuta cada vez que el patientId cambie
+  }, [patientId]);
 
   const handleAddService = () => {
     setFormData({
@@ -83,11 +77,10 @@ const PatientHistory: React.FC<PatientHistoryProps> = ({ patientId }) => {
   const calculateTotal = () => {
     return formData.servicios.reduce((total, item) => {
       const service = services.find((s) => s.id === item.servicioId);
-      return total + (service?.precio || 0) * item.cantidad;
+      return total + (service?.precio || 0) * (item.cantidad || 0);
     }, 0);
   };
 
-  // ¡MODIFICADO! Ahora es async y usa try/catch
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.servicios.length === 0) {
@@ -119,7 +112,6 @@ const PatientHistory: React.FC<PatientHistoryProps> = ({ patientId }) => {
     }
   };
 
-  // ¡NUEVO! Esqueleto de carga para el historial
   const HistoryLoadingSkeleton = () => (
     <Card>
       <CardHeader>
@@ -137,7 +129,7 @@ const PatientHistory: React.FC<PatientHistoryProps> = ({ patientId }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Historial Clínico</h3>
+        <h3 className="text-lg font-semibold">Historial de Procedimientos</h3>
         <Button onClick={() => setIsDialogOpen(true)} disabled={historialLoading}>
           <Plus className="h-4 w-4 mr-2" />
           Nueva Entrada
@@ -233,11 +225,14 @@ const PatientHistory: React.FC<PatientHistoryProps> = ({ patientId }) => {
                         ))}
                       </SelectContent>
                     </Select>
+                    
+                    {/* --- ¡CORREGIDO! --- */}
                     <Input
                       type="number"
-                      min="1"
+                      min="0.01" // <-- MODIFICADO
+                      step="0.01" // <-- AÑADIDO
                       value={item.cantidad}
-                      onChange={(e) => handleServiceChange(index, 'cantidad', parseInt(e.target.value) || 1)}
+                      onChange={(e) => handleServiceChange(index, 'cantidad', parseFloat(e.target.value) || 0)}
                       className="w-24"
                       placeholder="Cant."
                     />
