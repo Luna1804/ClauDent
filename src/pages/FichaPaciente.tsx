@@ -1,4 +1,4 @@
-// RF03-RF06: Patient file with tabs (Data, History, Attachments, Odontogram, Quotations)
+// RF03-RF06: Patient file (CORREGIDO)
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, User, FileText, Paperclip, Heart, DollarSign } from 'lucide-react';
@@ -50,11 +50,12 @@ const FichaPaciente: React.FC = () => {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1">
+          {/* ¡CORREGIDO! Usamos nombres, apellidos y curp */}
           <h1 className="text-3xl font-bold text-foreground">
-            {patient.nombre} {patient.apellido}
+            {patient.nombres} {patient.apellidos}
           </h1>
           <p className="text-muted-foreground">
-            {patient.rut} · {calculateAge(patient.fechaNacimiento)} años · {patient.estado}
+            {patient.curp || 'N/A'} · {calculateAge(patient.fechaNacimiento)} años · {patient.estado}
           </p>
         </div>
       </div>
@@ -62,7 +63,7 @@ const FichaPaciente: React.FC = () => {
       <Card>
         <CardContent className="p-0">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 h-auto">
+            <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 h-auto overflow-x-auto">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (

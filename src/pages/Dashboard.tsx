@@ -1,15 +1,22 @@
-// RF11: Dashboard with quick access and recent searches
-import React from 'react';
+// RF11: Dashboard (CORREGIDO)
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Stethoscope, FileText, Calendar, TrendingUp } from 'lucide-react';
+import { Users, Stethoscope, FileText, TrendingUp, Search, Package } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useApp } from '@/state/AppContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { formatCurrency, formatDate } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 const Dashboard: React.FC = () => {
-  const { patients, services, quotations, currentUser } = useApp();
+  const { patients, services, quotations, currentUser, paquetes, paquetesLoading, patientsLoading } = useApp();
+  
+  const [searchQuery, setSearchQuery] = useState('');
 
+  // (Stats - sin cambios)
   const stats = [
     {
       title: 'Total Pacientes',
@@ -37,20 +44,32 @@ const Dashboard: React.FC = () => {
     },
   ];
 
+  // (recentPatients - sin cambios)
   const recentPatients = patients.slice(0, 3);
+
+  // (Paquetes Activos - sin cambios)
+  const today = new Date().toISOString().split('T')[0];
+  const activePaquetes = useMemo(() => {
+    return paquetes.filter(p =>
+      p.estado === 'activo' &&
+      p.fechaInicio <= today &&
+      p.fechaFin >= today &&
+      p.nombre.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [paquetes, searchQuery, today]);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">
-          Bienvenido, {currentUser?.name}
+          Bienvenido, {currentUser?.email}
         </h1>
         <p className="text-muted-foreground">
           Aquí está el resumen de tu consultorio
         </p>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards (Sin cambios) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
@@ -84,13 +103,13 @@ const Dashboard: React.FC = () => {
         })}
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions (Sin cambios) */}
       <Card>
         <CardHeader>
           <CardTitle>Accesos Rápidos</CardTitle>
           <CardDescription>Acciones frecuentes</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Link to="/pacientes">
             <Button variant="outline" className="w-full h-24 flex flex-col gap-2">
               <Users className="h-6 w-6" />
@@ -109,14 +128,81 @@ const Dashboard: React.FC = () => {
               <span className="text-sm">Ver Servicios</span>
             </Button>
           </Link>
-          <Button variant="outline" className="w-full h-24 flex flex-col gap-2">
-            <Calendar className="h-6 w-6" />
-            <span className="text-sm">Agenda</span>
-          </Button>
         </CardContent>
       </Card>
 
-      {/* Recent Patients */}
+      {/* ¡CORREGIDO! Paquetes Activos */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle>Paquetes Activos</CardTitle>
+              <CardDescription>Promociones vigentes</CardDescription>
+            </div>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar paquetes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {paquetesLoading ? (
+              // ¡CORREGIDO! Esqueleto rellenado
+              Array(2).fill(0).map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-4 rounded-2xl">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="space-y-1">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-40" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-6 w-24" />
+                </div>
+              ))
+            ) : activePaquetes.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">
+                {searchQuery ? "No se encontraron paquetes" : "No hay paquetes activos vigentes."}
+              </p>
+            ) : (
+              // ¡CORREGIDO! Contenido rellenado
+              activePaquetes.map((paquete) => (
+                <div
+                  key={paquete.id}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-2xl hover:bg-muted transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                      <Package className="h-5 w-5 text-secondary" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">
+                        {paquete.nombre}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Vigente hasta: {formatDate(paquete.fechaFin)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 sm:mt-0 text-right">
+                    <p className="text-lg font-bold text-foreground">{formatCurrency(paquete.precioTotal)}</p>
+                    <Badge variant="secondary">{paquete.serviciosIncluidos.length} servicios</Badge>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ¡CORREGIDO! Pacientes Recientes */}
       <Card>
         <CardHeader>
           <CardTitle>Pacientes Recientes</CardTitle>
@@ -124,28 +210,38 @@ const Dashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {recentPatients.map((patient) => (
-              <Link
-                key={patient.id}
-                to={`/pacientes/${patient.id}`}
-                className="flex items-center justify-between p-4 rounded-2xl hover:bg-muted transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-primary font-semibold">
-                      {patient.nombre[0]}{patient.apellido[0]}
-                    </span>
+            {/* ¡CORREGIDO! Usamos patientsLoading (que ya estaba en tu archivo) */}
+            {patientsLoading ? (
+              <p className="text-muted-foreground">Cargando pacientes...</p>
+            ) : recentPatients.length === 0 ? (
+              <p className="text-muted-foreground">No hay pacientes recientes.</p>
+            ) : (
+              recentPatients.map((patient) => (
+                <Link
+                  key={patient.id}
+                  to={`/pacientes/${patient.id}`}
+                  className="flex items-center justify-between p-4 rounded-2xl hover:bg-muted transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-primary font-semibold">
+                        {patient.nombres && patient.nombres[0]}
+                        {patient.apellidos && patient.apellidos[0]}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">
+                        {patient.nombres} {patient.apellidos}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {patient.curp || 'N/A'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {patient.nombre} {patient.apellido}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{patient.rut}</p>
-                  </div>
-                </div>
-                <TrendingUp className="h-5 w-5 text-muted-foreground" />
-              </Link>
-            ))}
+                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                </Link>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

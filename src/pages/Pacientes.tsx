@@ -1,9 +1,9 @@
-// RF02-RF05: Patients list with CRUD operations (Conectado a Firebase)
+// RF02-RF05: Patients list with CRUD operations (Formulario CORREGIDO)
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Edit, Trash2, Eye, Filter } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useApp } from '@/state/AppContext';
+import { useApp, Patient } from '@/state/AppContext';
 import { calculateAge } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,88 +27,109 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner'; // ¡Importamos toast!
-import { Skeleton } from '@/components/ui/skeleton'; // ¡Importamos Skeleton!
+import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
+
+const initialFormData: Omit<Patient, 'id' | 'fechaRegistro'> = {
+  nombres: '',
+  apellidos: '',
+  fechaNacimiento: '',
+  sexo: 'X',
+  telefonoPrincipal: '',
+  telefonoContacto: '',
+  correo: '',
+  curp: '',
+  direccion: '',
+  calle: '',
+  numeroExterior: '',
+  numeroInterior: '',
+  colonia: '',
+  municipio: '',
+  estadoDireccion: '',
+  estadoCivil: '',
+  estado: 'activo',
+};
 
 const Pacientes: React.FC = () => {
-  // Obtenemos los datos y funciones de AppContext
-  // ¡NUEVO! Obtenemos patientsLoading
   const { patients, addPatient, updatePatient, deletePatient, searchQuery, setSearchQuery, patientsLoading } = useApp();
   
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const [filterStatus, setFilterStatus] = useState<'all' | 'activo' | 'inactivo'>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<string | null>(null);
-  
-  // ¡NUEVO! Estado de carga para los formularios
   const [isFormLoading, setIsFormLoading] = useState(false); 
-
-  const [formData, setFormData] = useState({
-    nombre: '',
-    apellido: '',
-    rut: '',
-    fechaNacimiento: '',
-    telefono: '',
-    email: '',
-    direccion: '',
-    estado: 'activo' as 'activo' | 'inactivo',
-  });
+  const [crearHistorial, setCrearHistorial] = useState(false);
+  
+  const [formData, setFormData] = useState<Omit<Patient, 'id' | 'fechaRegistro'>>(initialFormData);
 
   const filteredPatients = useMemo(() => {
     return patients.filter((patient) => {
       const matchesSearch =
-        patient.nombre.toLowerCase().includes(localSearch.toLowerCase()) ||
-        patient.apellido.toLowerCase().includes(localSearch.toLowerCase()) ||
-        (patient.rut && patient.rut.includes(localSearch)); // Añadimos chequeo por si rut es undefined
+        patient.nombres.toLowerCase().includes(localSearch.toLowerCase()) ||
+        patient.apellidos.toLowerCase().includes(localSearch.toLowerCase()) ||
+        (patient.curp && patient.curp.toLowerCase().includes(localSearch.toLowerCase()));
       const matchesStatus = filterStatus === 'all' || patient.estado === filterStatus;
       return matchesSearch && matchesStatus;
     });
   }, [patients, localSearch, filterStatus]);
 
   const handleOpenDialog = (patientId?: string) => {
+    setCrearHistorial(false);
     if (patientId) {
       const patient = patients.find((p) => p.id === patientId);
       if (patient) {
         setFormData({
-          nombre: patient.nombre,
-          apellido: patient.apellido,
-          rut: patient.rut,
+          nombres: patient.nombres,
+          apellidos: patient.apellidos,
           fechaNacimiento: patient.fechaNacimiento,
-          telefono: patient.telefono,
-          email: patient.email,
-          direccion: patient.direccion,
+          sexo: patient.sexo,
+          telefonoPrincipal: patient.telefonoPrincipal,
+          telefonoContacto: patient.telefonoContacto || '',
+          correo: patient.correo,
+          curp: patient.curp || '',
+          direccion: patient.direccion || '',
+          calle: patient.calle || '',
+          numeroExterior: patient.numeroExterior || '',
+          numeroInterior: patient.numeroInterior || '',
+          colonia: patient.colonia || '',
+          municipio: patient.municipio || '',
+          estadoDireccion: patient.estadoDireccion || '',
+          estadoCivil: patient.estadoCivil || '',
           estado: patient.estado,
         });
         setEditingPatient(patientId);
       }
     } else {
-      setFormData({
-        nombre: '',
-        apellido: '',
-        rut: '',
-        fechaNacimiento: '',
-        telefono: '',
-        email: '',
-        direccion: '',
-        estado: 'activo',
-      });
+      setFormData(initialFormData);
       setEditingPatient(null);
     }
     setIsDialogOpen(true);
   };
 
-  // ¡MODIFICADO! Ahora es async y usa try/catch
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsFormLoading(true);
     
+    if (!formData.nombres || !formData.apellidos || !formData.fechaNacimiento || !formData.telefonoPrincipal || !formData.correo) {
+      toast.error("Nombres, Apellidos, Fecha de Nac., Teléfono y Correo son obligatorios.");
+      setIsFormLoading(false);
+      return;
+    }
+
     try {
       if (editingPatient) {
-        await updatePatient(editingPatient, formData);
+        const { ...updates } = formData;
+        await updatePatient(editingPatient, updates);
         toast.success('Paciente actualizado correctamente');
       } else {
-        await addPatient(formData);
+        const newPatientId = await addPatient(formData);
         toast.success('Paciente creado correctamente');
+
+        if (crearHistorial) {
+          toast.info(`(WIP) Abriendo modal de historial para Paciente ID: ${newPatientId.substring(0, 5)}...`);
+        }
       }
       setIsDialogOpen(false);
       setEditingPatient(null);
@@ -119,12 +140,9 @@ const Pacientes: React.FC = () => {
       setIsFormLoading(false);
     }
   };
-
-  // ¡MODIFICADO! Ahora es async y usa try/catch
   const handleDelete = async (id: string) => {
-    // Usamos el diálogo de alerta en lugar de confirm (mejora para el futuro)
     if (confirm('¿Está seguro de eliminar este paciente?')) {
-      setIsFormLoading(true); // Re-usamos el loading state
+      setIsFormLoading(true);
       try {
         await deletePatient(id);
         toast.success('Paciente eliminado correctamente');
@@ -137,7 +155,7 @@ const Pacientes: React.FC = () => {
     }
   };
 
-  // ¡NUEVO! Componente para mostrar esqueletos de carga
+  // ¡CORREGIDO! Función rellenada
   const TableLoadingSkeleton = () => (
     Array(3).fill(0).map((_, index) => (
       <TableRow key={index}>
@@ -157,9 +175,18 @@ const Pacientes: React.FC = () => {
       </TableRow>
     ))
   );
+  
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
+  const handleSelectChange = (id: string, value: string) => {
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
 
   return (
     <div className="space-y-6">
+      {/* (Cabecera y Filtros - sin cambios) */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Pacientes</h1>
@@ -170,8 +197,6 @@ const Pacientes: React.FC = () => {
           Nuevo Paciente
         </Button>
       </div>
-
-      {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Filtros y Búsqueda</CardTitle>
@@ -181,7 +206,7 @@ const Pacientes: React.FC = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Buscar por nombre, apellido o RUT..."
+              placeholder="Buscar por nombre, apellido o CURP..."
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
               className="pl-10"
@@ -201,7 +226,7 @@ const Pacientes: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Table */}
+      {/* Tabla (sin cambios) */}
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -209,16 +234,15 @@ const Pacientes: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Paciente</TableHead>
-                  <TableHead>RUT</TableHead>
+                  <TableHead>CURP</TableHead>
                   <TableHead>Edad</TableHead>
                   <TableHead>Teléfono</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Correo</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* ¡MODIFICADO! Mostrar esqueletos o datos */}
                 {patientsLoading ? (
                   <TableLoadingSkeleton />
                 ) : filteredPatients.length === 0 ? (
@@ -231,12 +255,12 @@ const Pacientes: React.FC = () => {
                   filteredPatients.map((patient) => (
                     <TableRow key={patient.id}>
                       <TableCell className="font-medium">
-                        {patient.nombre} {patient.apellido}
+                        {patient.nombres} {patient.apellidos}
                       </TableCell>
-                      <TableCell>{patient.rut}</TableCell>
+                      <TableCell>{patient.curp || 'N/A'}</TableCell>
                       <TableCell>{calculateAge(patient.fechaNacimiento)} años</TableCell>
-                      <TableCell>{patient.telefono}</TableCell>
-                      <TableCell>{patient.email}</TableCell>
+                      <TableCell>{patient.telefonoPrincipal}</TableCell>
+                      <TableCell>{patient.correo}</TableCell>
                       <TableCell>
                         <Badge variant={patient.estado === 'activo' ? 'default' : 'secondary'}>
                           {patient.estado}
@@ -278,103 +302,149 @@ const Pacientes: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Dialog */}
+      {/* ¡MODIFICADO! Modal con formulario corregido */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingPatient ? 'Editar Paciente' : 'Nuevo Paciente'}</DialogTitle>
             <DialogDescription>
               {editingPatient ? 'Modifica los datos del paciente' : 'Ingresa los datos del nuevo paciente'}
             </DialogDescription>
           </DialogHeader>
-          {/* ¡MODIFICADO! Formulario ahora usa handleSubmit */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <fieldset disabled={isFormLoading} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="nombre">Nombre *</Label>
-                  <Input
-                    id="nombre"
-                    value={formData.nombre}
-                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="apellido">Apellido *</Label>
-                  <Input
-                    id="apellido"
-                    value={formData.apellido}
-                    onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="rut">RUT *</Label>
-                  <Input
-                    id="rut"
-                    value={formData.rut}
-                    onChange={(e) => setFormData({ ...formData, rut: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fechaNacimiento">Fecha de Nacimiento *</Label>
-                  <Input
-                    id="fechaNacimiento"
-                    type="date"
-                    value={formData.fechaNacimiento}
-                    onChange={(e) => setFormData({ ...formData, fechaNacimiento: e.target.value })}
-                    required
-                  />
+          <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+            <fieldset disabled={isFormLoading} className="space-y-6">
+              
+              {/* --- Datos Personales --- */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Datos Personales</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="nombres">Nombres *</Label>
+                    <Input id="nombres" value={formData.nombres} onChange={handleFormChange} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="apellidos">Apellidos *</Label>
+                    <Input id="apellidos" value={formData.apellidos} onChange={handleFormChange} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fechaNacimiento">Fecha de Nacimiento *</Label>
+                    <Input id="fechaNacimiento" type="date" value={formData.fechaNacimiento} onChange={handleFormChange} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sexo">Sexo *</Label>
+                    {/* ¡CORREGIDO! 'id' movido a SelectTrigger */}
+                    <Select value={formData.sexo} onValueChange={(v) => handleSelectChange('sexo', v)}>
+                      <SelectTrigger id="sexo"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="M">Masculino</SelectItem>
+                        <SelectItem value="F">Femenino</SelectItem>
+                        <SelectItem value="X">No especificar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="curp">CURP</Label>
+                    <Input id="curp" value={formData.curp} onChange={handleFormChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="estadoCivil">Estado Civil</Label>
+                    <Input id="estadoCivil" value={formData.estadoCivil} onChange={handleFormChange} />
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="telefono">Teléfono *</Label>
-                  <Input
-                    id="telefono"
-                    value={formData.telefono}
-                    onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
-                    required
-                  />
+              
+              <Separator />
+
+              {/* --- Datos de Contacto --- */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Datos de Contacto</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="telefonoPrincipal">Teléfono Principal *</Label>
+                    <Input id="telefonoPrincipal" value={formData.telefonoPrincipal} onChange={handleFormChange} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="telefonoContacto">Teléfono de Contacto (Opcional)</Label>
+                    <Input id="telefonoContacto" value={formData.telefonoContacto} onChange={handleFormChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="correo">Correo Electrónico *</Label>
+                    <Input id="correo" type="email" value={formData.correo} onChange={handleFormChange} required />
+                  </div>
                 </div>
+              </div>
+
+              <Separator />
+
+              {/* --- Dirección --- */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Dirección (Opcional)</h3>
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                  />
+                  <Label htmlFor="direccion">Dirección (Línea 1)</Label>
+                  <Input id="direccion" value={formData.direccion} onChange={handleFormChange} placeholder="Ej. Av. Siempre Viva 123" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="calle">Calle</Label>
+                    <Input id="calle" value={formData.calle} onChange={handleFormChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="numeroExterior">Num. Exterior</Label>
+                    <Input id="numeroExterior" value={formData.numeroExterior} onChange={handleFormChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="numeroInterior">Num. Interior</Label>
+                    <Input id="numeroInterior" value={formData.numeroInterior} onChange={handleFormChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="colonia">Colonia</Label>
+                    <Input id="colonia" value={formData.colonia} onChange={handleFormChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="municipio">Municipio / Delegación</Label>
+                    <Input id="municipio" value={formData.municipio} onChange={handleFormChange} />
+                  </div>
+                  <div className="space-y-2">
+                    {/* ¡CORREGIDO! Typo de </Lable> a </Label> */}
+                    <Label htmlFor="estadoDireccion">Estado</Label>
+                    <Input id="estadoDireccion" value={formData.estadoDireccion} onChange={handleFormChange} />
+                  </div>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="direccion">Dirección</Label>
-                <Input
-                  id="direccion"
-                  value={formData.direccion}
-                  onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
-                />
+              
+              <Separator />
+
+              {/* --- Opciones del Sistema --- */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="estado">Estado del Paciente</Label>
+                  {/* ¡CORREGIDO! 'id' movido a SelectTrigger */}
+                  <Select value={formData.estado} onValueChange={(v) => handleSelectChange('estado', v)}>
+                    <SelectTrigger id="estado"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="activo">Activo</SelectItem>
+                      <SelectItem value="inactivo">Inactivo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {!editingPatient && (
+                  <div className="flex items-center space-x-2 pt-4">
+                    <Checkbox
+                      id="crearHistorial"
+                      checked={crearHistorial}
+                      onCheckedChange={(checked) => setCrearHistorial(!!checked)}
+                    />
+                    <Label
+                      htmlFor="crearHistorial"
+                      className="text-sm font-medium leading-none"
+                    >
+                      Crear primera entrada de historial clínico
+                    </Label>
+                  </div>
+                )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="estado">Estado</Label>
-                <Select
-                  value={formData.estado}
-                  onValueChange={(v) => setFormData({ ...formData, estado: v as any })}
-                >
-                  <SelectTrigger id="estado">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="activo">Activo</SelectItem>
-                    <SelectItem value="inactivo">Inactivo</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
             </fieldset>
             <DialogFooter>
               <Button

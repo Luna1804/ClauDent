@@ -1,7 +1,7 @@
-// RF09: Quotations (Conectado a Firebase)
+// RF09: Quotations (Conectado a Firebase y PDF real)
 import React, { useState } from 'react';
-import { Plus, Download, Eye, FileText, Book, ClipboardPlus } from 'lucide-react'; // Importamos nuevos iconos
-import { useApp, QuotationItem } from '@/state/AppContext'; // ¡Importamos QuotationItem!
+import { Plus, Download, Eye, FileText, Book, ClipboardPlus } from 'lucide-react';
+import { useApp, QuotationItem } from '@/state/AppContext';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,28 +24,29 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea'; // ¡Importamos Textarea!
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+// ¡NUEVO! Importamos el generador de PDF
+import { generateQuotationPDF } from '@/lib/pdfGenerator'; 
 
 const Cotizaciones: React.FC = () => {
+  // Leemos 'patients' y 'services' para pasarlos al generador de PDF
   const { quotations, quotationsLoading, patients, services, addQuotation } = useApp();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isFormLoading, setIsFormLoading] = useState(false);
   
-  // ¡MODIFICADO! Usamos QuotationItem y añadimos 'notas'
   const [formData, setFormData] = useState({
     pacienteId: '',
     fecha: new Date().toISOString().split('T')[0],
-    items: [] as QuotationItem[], // Usamos la nueva interfaz
+    items: [] as QuotationItem[],
     descuento: 0,
     estado: 'borrador' as 'borrador' | 'enviada' | 'aceptada' | 'rechazada',
-    notas: '', // ¡NUEVO! Campo de notas
+    notas: '',
   });
 
-  // ¡NUEVO! Función para agregar un item de catálogo
   const handleAddCatalogoItem = () => {
     setFormData({
       ...formData,
@@ -56,7 +57,6 @@ const Cotizaciones: React.FC = () => {
     });
   };
 
-  // ¡NUEVO! Función para agregar un item personalizado
   const handleAddPersonalizadoItem = () => {
     setFormData({
       ...formData,
@@ -74,17 +74,15 @@ const Cotizaciones: React.FC = () => {
     });
   };
 
-  // ¡MODIFICADO! Maneja ambos tipos de items
   const handleItemChange = (index: number, field: string, value: any) => {
     const newItems = [...formData.items] as QuotationItem[];
     
-    // Si el campo es 'servicioId', es un item de catálogo
     if (field === 'servicioId') {
       const service = services.find((s) => s.id === value);
       if (service) {
         newItems[index].servicioId = service.id;
-        newItems[index].nombre = service.nombre; // Autocompletar nombre
-        newItems[index].precioUnitario = service.precio; // Autocompletar precio
+        newItems[index].nombre = service.nombre;
+        newItems[index].precioUnitario = service.precio;
       }
     } else {
       // @ts-ignore
@@ -104,15 +102,12 @@ const Cotizaciones: React.FC = () => {
     return subtotal - descuentoAmount;
   };
 
-  // ¡MODIFICADO! Ahora guarda las 'notas' y los 'items' flexibles
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.pacienteId || formData.items.length === 0) {
       toast.error('Debe seleccionar un paciente y agregar al menos un servicio');
       return;
     }
-
-    // Validar que los items personalizados tengan nombre y precio
     for (const item of formData.items) {
       if (item.servicioId === null && (!item.nombre || item.precioUnitario <= 0)) {
         toast.error('Los servicios personalizados deben tener nombre y precio.');
@@ -129,10 +124,9 @@ const Cotizaciones: React.FC = () => {
         descuento: formData.descuento,
         total: calculateTotal(),
         estado: formData.estado,
-        notas: formData.notas, // ¡Guardamos las notas!
+        notas: formData.notas,
       });
 
-      // Limpiamos el formulario
       setFormData({
         pacienteId: '',
         fecha: new Date().toISOString().split('T')[0],
@@ -151,19 +145,29 @@ const Cotizaciones: React.FC = () => {
     }
   };
 
+  // ¡MODIFICADO! Esta función ahora genera un PDF real
   const handleExportPDF = (quotationId: string) => {
-    // ... (sin cambios) ...
-    toast.success('PDF generado (simulado)');
-    const blob = new Blob(['Cotización simulada'], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `cotizacion-${quotationId}.pdf`;
-    a.click();
+    // 1. Encontrar la cotización completa
+    const quotation = quotations.find(q => q.id === quotationId);
+    if (!quotation) {
+      toast.error("No se encontró la cotización.");
+      return;
+    }
+
+    // 2. Encontrar los datos del paciente
+    const patient = patients.find(p => p.id === quotation.pacienteId);
+
+    // 3. Llamar al generador
+    try {
+      generateQuotationPDF(quotation, patient);
+      // El toast de éxito ya no es necesario, el generador se encarga
+    } catch (error) {
+      console.error("Error al generar PDF: ", error);
+      toast.error("Error al generar el PDF");
+    }
   };
 
   const estadoBadgeVariant = (estado: string) => {
-    // ... (sin cambios) ...
     switch (estado) {
       case 'aceptada':
         return 'default';
@@ -177,7 +181,6 @@ const Cotizaciones: React.FC = () => {
   };
 
   const TableLoadingSkeleton = () => (
-    // ... (sin cambios) ...
     Array(3).fill(0).map((_, index) => (
       <TableRow key={index}>
         <TableCell><Skeleton className="h-4 w-12" /></TableCell>
@@ -209,7 +212,7 @@ const Cotizaciones: React.FC = () => {
         </Button>
       </div>
 
-      {/* Summary Cards (sin cambios) */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {(['borrador', 'enviada', 'aceptada', 'rechazada'] as const).map((estado) => {
           const count = quotations.filter((q) => q.estado === estado).length;
@@ -228,7 +231,7 @@ const Cotizaciones: React.FC = () => {
         })}
       </div>
 
-      {/* Table (sin cambios) */}
+      {/* Table */}
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -295,7 +298,7 @@ const Cotizaciones: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* ¡MODIFICADO! Dialogo con nuevas funciones */}
+      {/* Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -334,7 +337,6 @@ const Cotizaciones: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <Label>Servicios</Label>
-                  {/* ¡NUEVO! Dos botones para agregar */}
                   <div className="flex gap-2">
                     <Button type="button" variant="outline" size="sm" onClick={handleAddCatalogoItem}>
                       <Book className="h-4 w-4 mr-1" />
@@ -346,11 +348,9 @@ const Cotizaciones: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-                {/* ¡MODIFICADO! Renderizado condicional de items */}
                 {formData.items.map((item, index) => (
                   <div key={index} className="flex gap-2 items-center">
                     {item.servicioId !== null ? (
-                      // Item de Catálogo (Select)
                       <Select
                         value={item.servicioId}
                         onValueChange={(v) => handleItemChange(index, 'servicioId', v)}
@@ -367,7 +367,6 @@ const Cotizaciones: React.FC = () => {
                         </SelectContent>
                       </Select>
                     ) : (
-                      // Item Personalizado (Inputs)
                       <>
                         <Input
                           type="text"
@@ -386,7 +385,6 @@ const Cotizaciones: React.FC = () => {
                         />
                       </>
                     )}
-                    {/* Campos comunes (Cantidad y Borrar) */}
                     <Input
                       type="number"
                       min="1"
@@ -430,7 +428,6 @@ const Cotizaciones: React.FC = () => {
                 </div>
               </div>
 
-              {/* ¡NUEVO! Campo de Notas */}
               <div className="space-y-2">
                 <Label htmlFor="notas">Notas Adicionales</Label>
                 <Textarea

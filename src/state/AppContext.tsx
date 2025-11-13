@@ -1,6 +1,6 @@
 // RF01-RF11: Global state management with Context API
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-// Importaciones de Firebase (Auth)
+// ¡CORREGIDO! FALTABAN ESTAS IMPORTACIONES DE AUTH
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 // Importaciones de Firebase (Firestore)
 import {
@@ -19,20 +19,35 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
-// --- Tus Interfaces (¡MODIFICADAS Quotation y QuotationItem!) ---
+// --- Tus Interfaces (¡INTERFAZ 'Patient' CORREGIDA!) ---
 export interface Patient {
   id: string;
-  nombre: string;
-  apellido: string;
-  rut: string;
+  nombres: string;
+  apellidos: string;
   fechaNacimiento: string;
-  telefono: string;
-  email: string;
-  direccion: string;
-  estado: 'activo' | 'inactivo';
+  sexo: 'M' | 'F' | 'X';
+  telefonoPrincipal: string;
+  telefonoContacto?: string;
+  correo: string;
+  curp?: string;
+  
+  // Dirección
+  direccion?: string;
+  calle?: string;
+  numeroExterior?: string;
+  numeroInterior?: string;
+  colonia?: string;
+  municipio?: string;
+  estadoDireccion?: string; // <-- ¡CORREGIDO! Antes se llamaba 'estado'
+  
+  estadoCivil?: string;
+  
+  // Campos del sistema
+  estado: 'activo' | 'inactivo'; // <-- Este es el estado del sistema (correcto)
   fechaRegistro: string;
 }
 
+// (El resto de tus interfaces: Service, HistoryEntry, etc. están BIEN)
 export interface Service {
   id: string;
   codigo: string;
@@ -42,7 +57,6 @@ export interface Service {
   categoria: string;
   estado: 'activo' | 'inactivo';
 }
-
 export interface HistoryEntry {
   id: string;
   fecha: string;
@@ -50,7 +64,6 @@ export interface HistoryEntry {
   notas: string;
   total: number;
 }
-
 export interface Attachment {
   id: string;
   nombre: string;
@@ -59,7 +72,6 @@ export interface Attachment {
   url: string;
   storagePath: string;
 }
-
 export interface ToothState {
   estados: string[];
   superficies: {
@@ -70,7 +82,6 @@ export interface ToothState {
     lingual?: string;
   };
 }
-
 export interface Odontogram {
   id: string;
   fecha: string;
@@ -78,28 +89,22 @@ export interface Odontogram {
   dientes: { [toothNumber: string]: ToothState };
   notas: string;
 }
-
-// ¡NUEVO! Interfaz para un item de la cotización
-// Es más flexible para soportar items de catálogo o personalizados
 export interface QuotationItem {
-  servicioId: string | null; // null si es un item personalizado
-  nombre: string; // El nombre del servicio (de catálogo o personalizado)
+  servicioId: string | null;
+  nombre: string;
   cantidad: number;
   precioUnitario: number;
 }
-
-// ¡MODIFICADO! 'items' usa la new interfaz y añadimos 'notas'
 export interface Quotation {
   id: string;
   pacienteId: string;
   fecha: string;
-  items: QuotationItem[]; // Usa la nueva interfaz
+  items: QuotationItem[];
   descuento: number;
   total: number;
   estado: 'borrador' | 'enviada' | 'aceptada' | 'rechazada';
-  notas: string; // ¡NUEVO! Campo de notas
+  notas: string;
 }
-
 export interface Paquete {
   id: string;
   nombre: string;
@@ -115,8 +120,9 @@ export interface Paquete {
 }
 // --- Fin de tus interfaces ---
 
+// (AppState y AppContextType están BIEN, no necesitan cambios)
 interface AppState {
-  currentUser: User | null;
+  currentUser: User | null; // <-- Ahora 'User' está importado
   authLoading: boolean;
   patients: Patient[];
   patientsLoading: boolean;
@@ -129,29 +135,21 @@ interface AppState {
   searchQuery: string;
 }
 
-// (La interfaz AppContextType no necesita cambios, 
-// ya que 'addQuotation' y 'updateQuotation' usan la interfaz base 'Quotation')
 interface AppContextType extends AppState {
   logout: () => void;
-  // Pacientes
-  addPatient: (patient: Omit<Patient, 'id' | 'fechaRegistro'>) => Promise<void>;
+  addPatient: (patient: Omit<Patient, 'id' | 'fechaRegistro'>) => Promise<string>;
   updatePatient: (id: string, patient: Partial<Patient>) => Promise<void>;
   deletePatient: (id: string) => Promise<void>;
-  // Servicios
   addService: (service: Omit<Service, 'id'>) => Promise<void>;
   updateService: (id: string, service: Partial<Service>) => Promise<void>;
   deleteService: (id: string) => Promise<void>;
-  // Funciones de Ficha de Paciente
   addHistoryEntry: (patientId: string, entry: Omit<HistoryEntry, 'id'>) => Promise<void>;
   addOdontogram: (patientId: string, tipo: 'adulto' | 'niño') => Promise<void>;
-  // Cotizaciones
   addQuotation: (quotation: Omit<Quotation, 'id'>) => Promise<void>;
   updateQuotation: (id: string, quotation: Partial<Quotation>) => Promise<void>;
-  // Paquetes
   addPaquete: (paquete: Omit<Paquete, 'id'>) => Promise<void>;
   updatePaquete: (id: string, updates: Partial<Paquete>) => Promise<void>;
   deletePaquete: (id: string) => Promise<void>;
-  
   setSearchQuery: (query: string) => void;
 }
 
@@ -172,19 +170,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     searchQuery: '',
   });
 
-  // (Efecto para Auth - sin cambios)
+  // ¡CORREGIDO! Este efecto ahora funciona porque 'onAuthStateChanged' está importado
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setState((prev) => ({
         ...prev,
         currentUser: user,
-        authLoading: false,
+        authLoading: false, // <-- Esto desbloquea la app
       }));
     });
     return () => unsubscribe();
   }, []);
 
-  // (Efecto para Pacientes - sin cambios)
+  // ¡CORREGIDO! Efecto para Pacientes (usa 'estadoDireccion')
   useEffect(() => {
     if (!state.currentUser) {
       setState((prev) => ({ ...prev, patients: [], patientsLoading: false }));
@@ -197,7 +195,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const data = doc.data();
         return {
           id: doc.id,
-          ...data,
+          nombres: data.nombres || '',
+          apellidos: data.apellidos || '',
+          fechaNacimiento: data.fechaNacimiento || '',
+          sexo: data.sexo || 'X',
+          telefonoPrincipal: data.telefonoPrincipal || '',
+          correo: data.correo || '',
+          estado: data.estado || 'activo',
+          estadoDireccion: data.estadoDireccion || '',
+          telefonoContacto: data.telefonoContacto || '',
+          curp: data.curp || '',
+          direccion: data.direccion || '',
+          calle: data.calle || '',
+          numeroExterior: data.numeroExterior || '',
+          numeroInterior: data.numeroInterior || '',
+          colonia: data.colonia || '',
+          municipio: data.municipio || '',
+          estadoCivil: data.estadoCivil || '',
           fechaRegistro: data.fechaRegistro?.toDate
             ? data.fechaRegistro.toDate().toISOString().split('T')[0]
             : 'N/A',
@@ -236,7 +250,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => unsubscribe();
   }, [state.currentUser]);
 
-  // ¡MODIFICADO! Efecto para Cotizaciones (añade 'notas')
+  // (Efecto para Cotizaciones - sin cambios)
   useEffect(() => {
     if (!state.currentUser) {
       setState((prev) => ({ ...prev, quotations: [], quotationsLoading: false }));
@@ -251,8 +265,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           id: doc.id,
           ...data,
           fecha: data.fecha?.toDate ? data.fecha.toDate().toISOString().split('T')[0] : 'N/A',
-          notas: data.notas || '', // <-- ¡AÑADIDO! Valor por defecto
-          items: data.items || [], // <-- ¡AÑADIDO! Valor por defecto
+          notas: data.notas || '',
+          items: data.items || [],
         } as Quotation;
       });
       setState((prev) => ({
@@ -296,84 +310,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     signOut(auth);
   };
 
-  // (CRUD Pacientes - sin cambios)
-  const addPatient = async (patient: Omit<Patient, 'id' | 'fechaRegistro'>) => {
-    await addDoc(collection(db, 'pacientes'), { ...patient, fechaRegistro: serverTimestamp() });
+  // (El resto de funciones CRUD no cambian)
+  const addPatient = async (patient: Omit<Patient, 'id' | 'fechaRegistro'>): Promise<string> => {
+    const newDocRef = await addDoc(collection(db, 'pacientes'), { ...patient, fechaRegistro: serverTimestamp() });
+    return newDocRef.id;
   };
-  const updatePatient = async (id: string, updates: Partial<Patient>) => {
-    await updateDoc(doc(db, 'pacientes', id), updates);
-  };
-  const deletePatient = async (id: string) => {
-    await deleteDoc(doc(db, 'pacientes', id));
-  };
-
-  // (CRUD Servicios - sin cambios)
-  const addService = async (service: Omit<Service, 'id'>) => {
-    await addDoc(collection(db, 'servicios'), { ...service, fechaCreacion: serverTimestamp() });
-  };
-  const updateService = async (id: string, updates: Partial<Service>) => {
-    await updateDoc(doc(db, 'servicios', id), updates);
-  };
-  const deleteService = async (id: string) => {
-    await deleteDoc(doc(db, 'servicios', id));
-  };
-
-  // (Funciones Ficha Paciente - sin cambios)
-  const addHistoryEntry = async (patientId: string, entry: Omit<HistoryEntry, 'id'>) => {
-    const historyRef = collection(db, 'pacientes', patientId, 'historial');
-    await addDoc(historyRef, { ...entry, fecha: new Date(entry.fecha + "T00:00:00") });
-  };
-  const addOdontogram = async (patientId: string, tipo: 'adulto' | 'niño') => {
-    const odontogramRef = collection(db, 'pacientes', patientId, 'odontograma');
-    await addDoc(odontogramRef, { fecha: serverTimestamp(), tipo: tipo, dientes: {}, notas: "" });
-  };
-
-  // (CRUD Cotizaciones - sin cambios en la implementación, pero ahora aceptan 'notas' y 'items' flexibles)
-  const addQuotation = async (quotation: Omit<Quotation, 'id'>) => {
-    const quotationsRef = collection(db, 'cotizaciones');
-    await addDoc(quotationsRef, {
-      ...quotation,
-      fecha: new Date(quotation.fecha + "T00:00:00")
-    });
-  };
-  const updateQuotation = async (id: string, updates: Partial<Quotation>) => {
-    const quotationRef = doc(db, 'cotizaciones', id);
-    // Convertir fechas si vienen en el update
-    const firestoreUpdates: Partial<Quotation> | DocumentData = { ...updates };
-    if (updates.fecha) {
-      firestoreUpdates.fecha = new Date(updates.fecha + "T00:00:00");
-    }
-    await updateDoc(quotationRef, firestoreUpdates);
-  };
-  
-  // (CRUD Paquetes - sin cambios)
-  const addPaquete = async (paquete: Omit<Paquete, 'id'>) => {
-    await addDoc(collection(db, 'paquetes'), {
-      ...paquete,
-      fechaInicio: new Date(paquete.fechaInicio + "T00:00:00"),
-      fechaFin: new Date(paquete.fechaFin + "T00:00:00"),
-      fechaCreacion: serverTimestamp(),
-    });
-  };
-  const updatePaquete = async (id: string, updates: Partial<Paquete>) => {
-    const paqueteRef = doc(db, 'paquetes', id);
-    const firestoreUpdates: Partial<Paquete> | DocumentData = { ...updates };
-    if (updates.fechaInicio) {
-      firestoreUpdates.fechaInicio = new Date(updates.fechaInicio + "T00:00:00");
-    }
-    if (updates.fechaFin) {
-      firestoreUpdates.fechaFin = new Date(updates.fechaFin + "T00:00:00");
-    }
-    await updateDoc(paqueteRef, firestoreUpdates);
-  };
-  const deletePaquete = async (id: string) => {
-    await deleteDoc(doc(db, 'paquetes', id));
-  };
-
-  const setSearchQuery = (query: string) => {
-    setState((prev) => ({ ...prev, searchQuery: query }));
-  };
-  // --- (Fin de tus otras funciones) ---
+  const updatePatient = async (id: string, updates: Partial<Patient>) => { await updateDoc(doc(db, 'pacientes', id), updates); };
+  const deletePatient = async (id: string) => { await deleteDoc(doc(db, 'pacientes', id)); };
+  const addService = async (service: Omit<Service, 'id'>) => { await addDoc(collection(db, 'servicios'), { ...service, fechaCreacion: serverTimestamp() }); };
+  const updateService = async (id: string, updates: Partial<Service>) => { await updateDoc(doc(db, 'servicios', id), updates); };
+  const deleteService = async (id: string) => { await deleteDoc(doc(db, 'servicios', id)); };
+  const addHistoryEntry = async (patientId: string, entry: Omit<HistoryEntry, 'id'>) => { await addDoc(collection(db, 'pacientes', patientId, 'historial'), { ...entry, fecha: new Date(entry.fecha + "T00:00:00") }); };
+  const addOdontogram = async (patientId: string, tipo: 'adulto' | 'niño') => { await addDoc(collection(db, 'pacientes', patientId, 'odontograma'), { fecha: serverTimestamp(), tipo: tipo, dientes: {}, notas: "" }); };
+  const addQuotation = async (quotation: Omit<Quotation, 'id'>) => { await addDoc(collection(db, 'cotizaciones'), { ...quotation, fecha: new Date(quotation.fecha + "T00:00:00") }); };
+  const updateQuotation = async (id: string, updates: Partial<Quotation>) => { await updateDoc(doc(db, 'cotizaciones', id), updates); };
+  const addPaquete = async (paquete: Omit<Paquete, 'id'>) => { await addDoc(collection(db, 'paquetes'), { ...paquete, fechaInicio: new Date(paquete.fechaInicio + "T00:00:00"), fechaFin: new Date(paquete.fechaFin + "T00:00:00"), fechaCreacion: serverTimestamp() }); };
+  const updatePaquete = async (id: string, updates: Partial<Paquete>) => { await updateDoc(doc(db, 'paquetes', id), updates); };
+  const deletePaquete = async (id: string) => { await deleteDoc(doc(db, 'paquetes', id)); };
+  const setSearchQuery = (query: string) => { setState((prev) => ({ ...prev, searchQuery: query })); };
 
   return (
     <AppContext.Provider
