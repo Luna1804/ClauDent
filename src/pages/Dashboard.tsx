@@ -12,6 +12,7 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
 const Dashboard: React.FC = () => {
+  // ¡CORREGIDO! patientsLoading se importa aquí
   const { patients, services, quotations, currentUser, paquetes, paquetesLoading, patientsLoading } = useApp();
   
   const [searchQuery, setSearchQuery] = useState('');

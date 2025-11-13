@@ -31,6 +31,8 @@ import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
+// ¡NUEVO! Importamos el modal de historial
+import InitialHistoryModal from '@/components/InitialHistoryModal';
 
 const initialFormData: Omit<Patient, 'id' | 'fechaRegistro'> = {
   nombres: '',
@@ -57,11 +59,17 @@ const Pacientes: React.FC = () => {
   
   const [localSearch, setLocalSearch] = useState(searchQuery);
   const [filterStatus, setFilterStatus] = useState<'all' | 'activo' | 'inactivo'>('all');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false); // Modal "Nuevo Paciente"
   const [editingPatient, setEditingPatient] = useState<string | null>(null);
   const [isFormLoading, setIsFormLoading] = useState(false); 
   const [crearHistorial, setCrearHistorial] = useState(false);
   
+  // ¡NUEVO! Estado para el modal de historial
+  const [historyModalState, setHistoryModalState] = useState<{isOpen: boolean; patientId: string | null}>({
+    isOpen: false,
+    patientId: null,
+  });
+
   const [formData, setFormData] = useState<Omit<Patient, 'id' | 'fechaRegistro'>>(initialFormData);
 
   const filteredPatients = useMemo(() => {
@@ -127,11 +135,12 @@ const Pacientes: React.FC = () => {
         const newPatientId = await addPatient(formData);
         toast.success('Paciente creado correctamente');
 
+        // ¡MODIFICADO! Abre el modal de historial
         if (crearHistorial) {
-          toast.info(`(WIP) Abriendo modal de historial para Paciente ID: ${newPatientId.substring(0, 5)}...`);
+          setHistoryModalState({ isOpen: true, patientId: newPatientId });
         }
       }
-      setIsDialogOpen(false);
+      setIsDialogOpen(false); // Cierra el modal de "Nuevo Paciente"
       setEditingPatient(null);
     } catch (error) {
       console.error(error);
@@ -140,6 +149,7 @@ const Pacientes: React.FC = () => {
       setIsFormLoading(false);
     }
   };
+
   const handleDelete = async (id: string) => {
     if (confirm('¿Está seguro de eliminar este paciente?')) {
       setIsFormLoading(true);
@@ -176,6 +186,7 @@ const Pacientes: React.FC = () => {
     ))
   );
   
+  // ¡CORREGIDO! Funciones rellenadas
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: value }));
@@ -186,7 +197,6 @@ const Pacientes: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* (Cabecera y Filtros - sin cambios) */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Pacientes</h1>
@@ -226,7 +236,6 @@ const Pacientes: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Tabla (sin cambios) */}
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -302,7 +311,6 @@ const Pacientes: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* ¡MODIFICADO! Modal con formulario corregido */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -466,6 +474,13 @@ const Pacientes: React.FC = () => {
           </form>
         </DialogContent>
       </Dialog>
+      
+      {/* ¡NUEVO! Renderizamos el nuevo modal (estará oculto) */}
+      <InitialHistoryModal 
+        isOpen={historyModalState.isOpen}
+        patientId={historyModalState.patientId}
+        onClose={() => setHistoryModalState({ isOpen: false, patientId: null })}
+      />
     </div>
   );
 };
