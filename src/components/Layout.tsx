@@ -66,7 +66,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
             <Stethoscope className="h-5 w-5 text-primary-foreground" />
           </div>
-          <h1 className="text-lg font-semibold text-foreground">DentalApp</h1>
+          <h1 className="text-lg font-semibold text-foreground">ClauDent</h1>
         </div>
 
         {/* RF10: Global Search */}

@@ -1,7 +1,7 @@
-// RF03-RF06: Patient file (CORREGIDO)
+// RF03-RF06: Patient file (¡MODIFICADO! con Pestaña Antecedentes)
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, User, FileText, Paperclip, Heart, DollarSign } from 'lucide-react';
+import { ArrowLeft, User, FileText, Paperclip, Heart, DollarSign, ClipboardPaste } from 'lucide-react'; // ¡NUEVO! ClipboardPaste
 import { motion } from 'framer-motion';
 import { useApp } from '@/state/AppContext';
 import { calculateAge } from '@/lib/utils';
@@ -13,6 +13,7 @@ import PatientHistory from '@/components/PatientHistory';
 import PatientAttachments from '@/components/PatientAttachments';
 import PatientOdontogram from '@/components/PatientOdontogram';
 import PatientQuotations from '@/components/PatientQuotations';
+import PatientAntecedentes from '@/components/PatientAntecedentes'; // ¡NUEVO!
 
 const FichaPaciente: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -31,8 +32,10 @@ const FichaPaciente: React.FC = () => {
     );
   }
 
+  // ¡MODIFICADO! Añadimos la nueva pestaña
   const tabs = [
     { value: 'datos', label: 'Datos', icon: User },
+    { value: 'antecedentes', label: 'Antecedentes', icon: ClipboardPaste }, // ¡NUEVO!
     { value: 'historial', label: 'Historial', icon: FileText },
     { value: 'adjuntos', label: 'Adjuntos', icon: Paperclip },
     { value: 'odontograma', label: 'Odontograma', icon: Heart },
@@ -50,7 +53,6 @@ const FichaPaciente: React.FC = () => {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1">
-          {/* ¡CORREGIDO! Usamos nombres, apellidos y curp */}
           <h1 className="text-3xl font-bold text-foreground">
             {patient.nombres} {patient.apellidos}
           </h1>
@@ -82,6 +84,11 @@ const FichaPaciente: React.FC = () => {
             <div className="p-6">
               <TabsContent value="datos" className="mt-0">
                 <PatientData patient={patient} />
+              </TabsContent>
+              
+              {/* ¡NUEVO! Contenido de la pestaña */}
+              <TabsContent value="antecedentes" className="mt-0">
+                <PatientAntecedentes />
               </TabsContent>
 
               <TabsContent value="historial" className="mt-0">

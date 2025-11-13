@@ -63,7 +63,7 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">
-          Bienvenido, {currentUser?.email}
+          Bienvenido
         </h1>
         <p className="text-muted-foreground">
           Aquí está el resumen de tu consultorio

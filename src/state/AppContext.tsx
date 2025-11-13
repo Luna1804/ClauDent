@@ -224,6 +224,52 @@ export interface IHistoriaClinicaCompleta {
   exploracionAtm: IExploracionAtm;
   cavidadOral: ICavidadOral;
 }
+
+// ¡CORREGIDO! Exportamos la variable initialState
+export const initialState: IHistoriaClinicaCompleta = {
+  historiaGeneral: {
+    ocupacion: '', escolaridad: '', estado_civil: '', telefono: '',
+    fecha_ult_consulta_medica: '', motivo_ult_consulta_medica: '',
+    fecha_ult_consulta_odontologica: '', motivo_ult_consulta_odontologica: ''
+  },
+  antecedentesHereditarios: {
+    madre: '', padre: '', hermanos: '', hijos: '', esposo: '', tios: '', abuelos: ''
+  },
+  appPatologicos: {
+    ets: false, degenerativas: false, neoplasicas: false, congenitas: false, otras: ''
+  },
+  apnp: {
+    frecuencia_cepillado: '', auxiliares_higiene: false, auxiliares_cuales: '',
+    come_entre_comidas: false, grupo_sanguineo: '', adic_tabaco: false, adic_alcohol: false
+  },
+  alergias: {
+    antibioticos: false, analgesicos: false, anestesicos: false, alimentos: false, especificar: ''
+  },
+  hospitalizaciones: {
+    ha_sido_hospitalizado: false, fecha: '', motivo: ''
+  },
+  signosVitales: {
+    peso_kg: '', talla_m: '', frecuencia_cardiaca: '', tension_arterial_sistolica: '',
+    tension_arterial_diastolica: '', frecuencia_respiratoria: '', temperatura_c: ''
+  },
+  exploracionCabezaCuello: {
+    cabeza_exostosis: false, cabeza_endostosis: false, craneo_tipo: '', cara_asimetria_transversal: false,
+    cara_asimetria_longitudinal: false, perfil: '', piel: '', musculos: '',
+    cuello_cadena_ganglionar_palpable: false, otros: ''
+  },
+  exploracionAtm: {
+    ruidos: false, lateralidad: '', apertura_mm: '', chasquidos: false, crepitacion: false,
+    dificultad_abrir_boca: false, dolor_mov_lateralidad: false, fatiga_dolor_muscular: false,
+    disminucion_apertura: false, desviacion_apertura_cierre: false
+  },
+  cavidadOral: {
+    labio_estado: '', labio_nota: '', comisuras_estado: '', comisuras_nota: '',
+    carrillos_estado: '', carrillos_nota: '', fondo_de_saco_estado: '', fondo_de_saco_nota: '',
+    frenillos_estado: '', frenillos_nota: '', paladar_estado: '', paladar_nota: '',
+    lengua_estado: '', lengua_nota: '', piso_boca_estado: '', piso_boca_nota: '',
+    dientes_estado: '', dientes_nota: '', encia_estado: '', encia_nota: ''
+  }
+};
 // --- Fin de tus interfaces ---
 
 interface AppState {

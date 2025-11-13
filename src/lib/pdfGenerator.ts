@@ -127,7 +127,7 @@ export const generateQuotationPDF = (
   }
   doc.setFontSize(9);
   doc.setFont("helvetica", "italic");
-  doc.text("DentalApp - Cotización generada el " + new Date().toLocaleDateString('es-CL'), pageWidth / 2, pageHeight - 15, { align: "center" });
+  doc.text("ClauDent - Cotización generada el " + new Date().toLocaleDateString('es-CL'), pageWidth / 2, pageHeight - 15, { align: "center" });
 
   // --- 8. Guardar el PDF ---
   doc.save(`cotizacion-${quotation.id.substring(0, 6)}.pdf`);

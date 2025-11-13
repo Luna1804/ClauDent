@@ -385,7 +385,7 @@ const Cotizaciones: React.FC = () => {
                       className="w-24"
                       placeholder="Cant."
                     />
-                    <Button className="h-4 w-4"  type="button" variant="destructive" size="icon" onClick={() => handleRemoveItem(index)}>
+                    <Button className="h-4 w-4" type="button" variant="destructive" size="icon" onClick={() => handleRemoveItem(index)}>
                       X
                     </Button>
                   </div>

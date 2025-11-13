@@ -74,7 +74,7 @@ const Register: React.FC = () => {
             <div className="h-16 w-16 rounded-2xl bg-primary flex items-center justify-center mb-4">
               <Stethoscope className="h-10 w-10 text-primary-foreground" />
             </div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">DentalApp</h1>
+            <h1 className="text-3xl font-bold text-foreground mb-2">ClauDent</h1>
             <p className="text-muted-foreground text-center">
               Crear una nueva cuenta
             </p>
