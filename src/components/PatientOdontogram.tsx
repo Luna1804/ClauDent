@@ -1,166 +1,167 @@
-// RF06: Interactive odontogram with tooth surfaces
+// RF06: Lista de Odontogramas (Llama a la PÁGINA de edición)
 import React, { useState, useEffect } from 'react';
-import { useApp, Odontogram, ToothState } from '@/state/AppContext';
+import { Link } from 'react-router-dom'; // ¡NUEVO! Importamos Link
+import { useApp, Odontogram } from '@/state/AppContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+// Importaciones de Firebase
+import { collection, query, onSnapshot, orderBy, QuerySnapshot, DocumentData } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
+// Importaciones de UI
+import { Plus, Eye } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { formatDate } from '@/lib/utils';
+// ¡ELIMINADO! Ya no importamos el editor modal
 
 interface PatientOdontogramProps {
   patientId: string;
 }
 
-// Adult teeth (32 permanent teeth)
-const UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
-const UPPER_LEFT = [21, 22, 23, 24, 25, 26, 27, 28];
-const LOWER_LEFT = [31, 32, 33, 34, 35, 36, 37, 38];
-const LOWER_RIGHT = [48, 47, 46, 45, 44, 43, 42, 41];
-
-const ESTADO_COLORS = {
-  sano: 'bg-success hover:bg-success/80',
-  cariado: 'bg-destructive hover:bg-destructive/80',
-  tratado: 'bg-primary hover:bg-primary/80',
-  ausente: 'bg-muted hover:bg-muted/80',
-};
-
 const PatientOdontogram: React.FC<PatientOdontogramProps> = ({ patientId }) => {
-  const { patientData, updateOdontogram } = useApp();
-  const savedOdontogram = patientData[patientId]?.odontograma || {};
+  const { addOdontogram } = useApp();
   
-  const [odontogram, setOdontogram] = useState<Odontogram>(savedOdontogram);
-  const [selectedState, setSelectedState] = useState<'sano' | 'cariado' | 'tratado' | 'ausente'>('sano');
+  const [odontogramList, setOdontogramList] = useState<Odontogram[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+  
+  // Estado para el modal "Nuevo"
+  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedType, setSelectedType] = useState<'adulto' | 'niño'>('adulto');
 
-  const getToothState = (toothNumber: number): ToothState => {
-    return odontogram[toothNumber] || { estado: 'sano', superficies: {} };
-  };
+  // ¡ELIMINADO! El estado para el editor modal ya no es necesario
+  // const [editingOdontogramId, setEditingOdontogramId] = useState<string | null>(null);
 
-  const handleToothClick = (toothNumber: number) => {
-    const newOdontogram = {
-      ...odontogram,
-      [toothNumber]: {
-        estado: selectedState,
-        superficies: {},
-      },
-    };
-    setOdontogram(newOdontogram);
-  };
+  // Cargar la LISTA de odontogramas
+  useEffect(() => {
+    if (!patientId) return;
 
-  const handleSave = () => {
-    updateOdontogram(patientId, odontogram);
-    toast.success('Odontograma guardado correctamente');
-  };
+    setListLoading(true);
+    const odontogramRef = collection(db, 'pacientes', patientId, 'odontograma');
+    const q = query(odontogramRef, orderBy('fecha', 'desc'));
+    
+    const unsubscribe = onSnapshot(q, (querySnapshot: QuerySnapshot<DocumentData>) => {
+      const list: Odontogram[] = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          fecha: data.fecha?.toDate ? data.fecha.toDate().toISOString() : new Date().toISOString(),
+        } as Odontogram;
+      });
+      setOdontogramList(list);
+      setListLoading(false);
+    });
 
-  const Tooth: React.FC<{ number: number }> = ({ number }) => {
-    const state = getToothState(number);
-    return (
-      <button
-        onClick={() => handleToothClick(number)}
-        className={cn(
-          'relative h-16 w-12 rounded-lg border-2 border-border transition-all',
-          'flex flex-col items-center justify-center',
-          'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-          ESTADO_COLORS[state.estado]
-        )}
-        aria-label={`Diente ${number}, estado: ${state.estado}`}
-      >
-        <span className="text-xs font-bold text-foreground">{number}</span>
-        <span className="text-[10px] text-foreground/70">{state.estado}</span>
-      </button>
-    );
+    return () => unsubscribe();
+  }, [patientId]);
+
+  // Handler para crear uno nuevo
+  const handleCreateNew = async () => {
+    setIsSaving(true);
+    try {
+      await addOdontogram(patientId, selectedType);
+      toast.success(`Odontograma (${selectedType}) creado`);
+      setIsNewModalOpen(false);
+      setSelectedType('adulto');
+    } catch (error) {
+      console.error(error);
+      toast.error('Error al crear el odontograma');
+    } finally {
+      setIsSaving(false);
+    }
   };
+  
+  // Esqueleto de carga
+  const ListLoadingSkeleton = () => (
+    <div className="space-y-3">
+      <Skeleton className="h-16 w-full rounded-lg" />
+      <Skeleton className="h-16 w-full rounded-lg" />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Odontograma</h3>
-        <Button onClick={handleSave}>Guardar Cambios</Button>
-      </div>
-
-      {/* State selector */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-2">
-            <span className="text-sm font-medium mr-2 self-center">Estado a aplicar:</span>
-            {(['sano', 'cariado', 'tratado', 'ausente'] as const).map((estado) => (
-              <Button
-                key={estado}
-                variant={selectedState === estado ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedState(estado)}
-                className={cn(selectedState === estado && ESTADO_COLORS[estado])}
-              >
-                {estado.charAt(0).toUpperCase() + estado.slice(1)}
-              </Button>
-            ))}
+      {/* --- Modal para "Nuevo Odontograma" --- */}
+      <Dialog open={isNewModalOpen} onOpenChange={setIsNewModalOpen}>
+        <DialogTrigger asChild>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Odontograma
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Odontograma</DialogTitle>
+            <DialogDescription>
+              Selecciona el tipo de odontograma que deseas crear.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="tipo-odontograma">Tipo de Odontograma</Label>
+              <Select value={selectedType} onValueChange={(v) => setSelectedType(v as any)}>
+                <SelectTrigger id="tipo-odontograma">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="adulto">Adulto (Permanente)</SelectItem>
+                  <SelectItem value="niño">Niño (Temporal / Mixto)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsNewModalOpen(false)} disabled={isSaving}>Cancelar</Button>
+            <Button onClick={handleCreateNew} disabled={isSaving}>
+              {isSaving ? "Creando..." : "Crear"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* --- Lista de Odontogramas Existentes --- */}
+      <Card>
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Odontogramas Guardados</h3>
+          {listLoading ? (
+            <ListLoadingSkeleton />
+          ) : odontogramList.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">
+              No hay odontogramas guardados para este paciente.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {odontogramList.map((odonto) => (
+                <div 
+                  key={odonto.id} 
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted"
+                >
+                  <div>
+                    <p className="font-semibold capitalize">
+                      Odontograma {odonto.tipo}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Creado: {formatDate(odonto.fecha)}
+                    </p>
+                  </div>
+                  {/* ¡MODIFICADO! Este botón ahora es un Link */}
+                  <Link to={`/pacientes/${patientId}/odontograma/${odonto.id}`}>
+                    <Button variant="outline" size="icon">
+                      <Eye className="h-4 w-4" /> 
+                    </Button>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
-
-      {/* Odontogram grid */}
-      <div className="space-y-8 bg-card p-6 rounded-3xl border border-border">
-        {/* Upper jaw */}
-        <div>
-          <p className="text-sm font-medium text-muted-foreground mb-3 text-center">
-            Maxilar Superior
-          </p>
-          <div className="flex justify-center gap-8">
-            <div className="flex gap-1">
-              {UPPER_RIGHT.map((tooth) => (
-                <Tooth key={tooth} number={tooth} />
-              ))}
-            </div>
-            <div className="w-px bg-border" />
-            <div className="flex gap-1">
-              {UPPER_LEFT.map((tooth) => (
-                <Tooth key={tooth} number={tooth} />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-border" />
-
-        {/* Lower jaw */}
-        <div>
-          <p className="text-sm font-medium text-muted-foreground mb-3 text-center">
-            Maxilar Inferior
-          </p>
-          <div className="flex justify-center gap-8">
-            <div className="flex gap-1">
-              {LOWER_RIGHT.map((tooth) => (
-                <Tooth key={tooth} number={tooth} />
-              ))}
-            </div>
-            <div className="w-px bg-border" />
-            <div className="flex gap-1">
-              {LOWER_LEFT.map((tooth) => (
-                <Tooth key={tooth} number={tooth} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-sm font-medium mb-3">Leyenda:</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {(['sano', 'cariado', 'tratado', 'ausente'] as const).map((estado) => (
-              <div key={estado} className="flex items-center gap-2">
-                <div className={cn('h-4 w-4 rounded', ESTADO_COLORS[estado])} />
-                <span className="text-sm">{estado.charAt(0).toUpperCase() + estado.slice(1)}</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="bg-muted/50 rounded-2xl p-4 border border-border">
-        <p className="text-sm text-muted-foreground">
-          <strong>Instrucciones:</strong> Selecciona un estado en la barra superior y haz clic en los dientes para aplicarlo.
-        </p>
-      </div>
+      
+      {/* ¡ELIMINADO! El editor modal ya no se renderiza aquí */}
     </div>
   );
 };

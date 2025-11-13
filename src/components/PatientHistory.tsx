@@ -1,5 +1,5 @@
-// RF03: Patient clinical history
-import React, { useState } from 'react';
+// RF03: Patient clinical history (Conectado a sub-colección de Firebase)
+import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { useApp } from '@/state/AppContext';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -11,21 +11,54 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+// ¡NUEVO! Importaciones de Firebase
+import { collection, query, onSnapshot, orderBy, QuerySnapshot, DocumentData } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { HistoryEntry } from '@/state/AppContext'; // Importamos el tipo
+import { Skeleton } from '@/components/ui/skeleton'; // Importamos Skeleton
 
 interface PatientHistoryProps {
   patientId: string;
 }
 
 const PatientHistory: React.FC<PatientHistoryProps> = ({ patientId }) => {
-  const { patientData, services, addHistoryEntry } = useApp();
+  // 'services' y 'addHistoryEntry' vienen del context
+  const { services, addHistoryEntry } = useApp();
+  
+  // ¡NUEVO! Estado local para el historial y la carga
+  const [historial, setHistorial] = useState<HistoryEntry[]>([]);
+  const [historialLoading, setHistorialLoading] = useState(true);
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormLoading, setIsFormLoading] = useState(false);
   const [formData, setFormData] = useState({
     fecha: new Date().toISOString().split('T')[0],
     servicios: [] as { servicioId: string; cantidad: number }[],
     notas: '',
   });
 
-  const historial = patientData[patientId]?.historial || [];
+  // ¡NUEVO! Efecto para cargar el historial del paciente
+  useEffect(() => {
+    if (!patientId) return;
+
+    setHistorialLoading(true);
+    // Creamos la referencia a la sub-colección
+    const historyRef = collection(db, 'pacientes', patientId, 'historial');
+    // Creamos una consulta para ordenar por fecha descendente
+    const q = query(historyRef, orderBy('fecha', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot: QuerySnapshot<DocumentData>) => {
+      const historyData: HistoryEntry[] = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as HistoryEntry));
+      setHistorial(historyData);
+      setHistorialLoading(false);
+    });
+
+    // Limpiamos la suscripción al desmontar
+    return () => unsubscribe();
+  }, [patientId]); // Se ejecuta cada vez que el patientId cambie
 
   const handleAddService = () => {
     setFormData({
@@ -54,39 +87,70 @@ const PatientHistory: React.FC<PatientHistoryProps> = ({ patientId }) => {
     }, 0);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // ¡MODIFICADO! Ahora es async y usa try/catch
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.servicios.length === 0) {
       toast.error('Debe agregar al menos un servicio');
       return;
     }
-    addHistoryEntry(patientId, {
-      fecha: formData.fecha,
-      servicios: formData.servicios,
-      notas: formData.notas,
-      total: calculateTotal(),
-    });
-    setFormData({
-      fecha: new Date().toISOString().split('T')[0],
-      servicios: [],
-      notas: '',
-    });
-    setIsDialogOpen(false);
-    toast.success('Entrada agregada al historial');
+
+    setIsFormLoading(true);
+    try {
+      await addHistoryEntry(patientId, {
+        fecha: formData.fecha,
+        servicios: formData.servicios,
+        notas: formData.notas,
+        total: calculateTotal(),
+      });
+
+      setFormData({
+        fecha: new Date().toISOString().split('T')[0],
+        servicios: [],
+        notas: '',
+      });
+      setIsDialogOpen(false);
+      toast.success('Entrada agregada al historial');
+    } catch (error) {
+      console.error(error);
+      toast.error('Error al agregar la entrada');
+    } finally {
+      setIsFormLoading(false);
+    }
   };
+
+  // ¡NUEVO! Esqueleto de carga para el historial
+  const HistoryLoadingSkeleton = () => (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-4 w-24 mt-1" />
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-3 w-40" />
+        <Skeleton className="h-3 w-36" />
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Historial Clínico</h3>
-        <Button onClick={() => setIsDialogOpen(true)}>
+        <Button onClick={() => setIsDialogOpen(true)} disabled={historialLoading}>
           <Plus className="h-4 w-4 mr-2" />
           Nueva Entrada
         </Button>
       </div>
 
       <div className="space-y-4">
-        {historial.length === 0 ? (
+        {historialLoading ? (
+          <>
+            <HistoryLoadingSkeleton />
+            <HistoryLoadingSkeleton />
+          </>
+        ) : historial.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
               No hay entradas en el historial. Agrega la primera entrada.
@@ -107,7 +171,7 @@ const PatientHistory: React.FC<PatientHistoryProps> = ({ patientId }) => {
                       const service = services.find((s) => s.id === item.servicioId);
                       return (
                         <li key={idx} className="text-sm text-muted-foreground">
-                          {service?.nombre} x{item.cantidad}
+                          {service?.nombre || 'Servicio no encontrado'} x{item.cantidad}
                         </li>
                       );
                     })}
@@ -116,7 +180,7 @@ const PatientHistory: React.FC<PatientHistoryProps> = ({ patientId }) => {
                 {entry.notas && (
                   <div>
                     <p className="text-sm font-medium mb-1">Notas:</p>
-                    <p className="text-sm text-muted-foreground">{entry.notas}</p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{entry.notas}</p>
                   </div>
                 )}
               </CardContent>
@@ -132,83 +196,87 @@ const PatientHistory: React.FC<PatientHistoryProps> = ({ patientId }) => {
             <DialogDescription>Registra los servicios aplicados al paciente</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="fecha">Fecha</Label>
-              <Input
-                id="fecha"
-                type="date"
-                value={formData.fecha}
-                onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <Label>Servicios</Label>
-                <Button type="button" variant="outline" size="sm" onClick={handleAddService}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Agregar
-                </Button>
+            <fieldset disabled={isFormLoading} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fecha">Fecha</Label>
+                <Input
+                  id="fecha"
+                  type="date"
+                  value={formData.fecha}
+                  onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                  required
+                />
               </div>
-              {formData.servicios.map((item, index) => (
-                <div key={index} className="flex gap-2">
-                  <Select
-                    value={item.servicioId}
-                    onValueChange={(v) => handleServiceChange(index, 'servicioId', v)}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Seleccionar servicio" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {services.map((service) => (
-                        <SelectItem key={service.id} value={service.id}>
-                          {service.nombre} - {formatCurrency(service.precio)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={item.cantidad}
-                    onChange={(e) => handleServiceChange(index, 'cantidad', parseInt(e.target.value))}
-                    className="w-24"
-                    placeholder="Cant."
-                  />
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    onClick={() => handleRemoveService(index)}
-                  >
-                    ×
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <Label>Servicios</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={handleAddService}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Agregar
                   </Button>
                 </div>
-              ))}
-            </div>
+                {formData.servicios.map((item, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Select
+                      value={item.servicioId}
+                      onValueChange={(v) => handleServiceChange(index, 'servicioId', v)}
+                    >
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Seleccionar servicio" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {services.map((service) => (
+                          <SelectItem key={service.id} value={service.id}>
+                            {service.nombre} - {formatCurrency(service.precio)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={item.cantidad}
+                      onChange={(e) => handleServiceChange(index, 'cantidad', parseInt(e.target.value) || 1)}
+                      className="w-24"
+                      placeholder="Cant."
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => handleRemoveService(index)}
+                    >
+                      ×
+                    </Button>
+                  </div>
+                ))}
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notas">Notas</Label>
-              <Textarea
-                id="notas"
-                value={formData.notas}
-                onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
-                rows={4}
-                placeholder="Observaciones, diagnóstico, tratamiento..."
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="notas">Notas</Label>
+                <Textarea
+                  id="notas"
+                  value={formData.notas}
+                  onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
+                  rows={4}
+                  placeholder="Observaciones, diagnóstico, tratamiento..."
+                />
+              </div>
 
-            <div className="flex justify-between items-center p-4 bg-muted rounded-2xl">
-              <span className="font-medium">Total:</span>
-              <span className="text-xl font-bold">{formatCurrency(calculateTotal())}</span>
-            </div>
+              <div className="flex justify-between items-center p-4 bg-muted rounded-2xl">
+                <span className="font-medium">Total:</span>
+                <span className="text-xl font-bold">{formatCurrency(calculateTotal())}</span>
+              </div>
+            </fieldset>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isFormLoading}>
                 Cancelar
               </Button>
-              <Button type="submit">Guardar Entrada</Button>
+              <Button type="submit" disabled={isFormLoading}>
+                {isFormLoading ? 'Guardando...' : 'Guardar Entrada'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
