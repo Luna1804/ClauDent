@@ -1,28 +1,30 @@
-// (NUEVO ARCHIVO) Página de Registro
+// (REGISTRO CON OJITO PARA VER CONTRASEÑAS)
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Stethoscope } from 'lucide-react';
+import { Stethoscope, Eye, EyeOff } from 'lucide-react'; // Importamos iconos
 import { motion } from 'framer-motion';
-// Importaciones de Firebase
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase'; // Importamos auth
-// Importaciones de UI
+import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { toast } from 'sonner'; // Para mostrar errores
+import { toast } from 'sonner';
 
 const Register: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // Estados para mostrar/ocultar contraseñas
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Verificación de contraseña
     if (password !== confirmPassword) {
       toast.error('Las contraseñas no coinciden');
       return;
@@ -36,17 +38,12 @@ const Register: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // ¡Aquí está la magia!
       await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Si tiene éxito, Firebase automáticamente inicia sesión al usuario.
-      // El 'onAuthStateChanged' en AppContext nos moverá al dashboard.
       toast.success('¡Cuenta creada! Bienvenido.');
       navigate('/dashboard');
 
     } catch (error: any) {
       console.error(error);
-      // Manejo de errores de Firebase
       let errorMessage = 'Error al crear la cuenta';
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = 'Este email ya está en uso';
@@ -71,10 +68,8 @@ const Register: React.FC = () => {
       >
         <div className="bg-card rounded-3xl shadow-lg p-8 border border-border">
           <div className="flex flex-col items-center mb-8">
-            <div className="h-16 w-16 rounded-2xl bg-primary flex items-center justify-center mb-4">
-              <Stethoscope className="h-10 w-10 text-primary-foreground" />
-            </div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">ClauDent</h1>
+            <img src="/logo.png" alt="ClauDent" className="w-36 object-contain mb-4" />
+            <h1 className="text-3xl font-bold text-foreground mb-2">DentalApp</h1>
             <p className="text-muted-foreground text-center">
               Crear una nueva cuenta
             </p>
@@ -96,32 +91,54 @@ const Register: React.FC = () => {
               />
             </div>
 
+            {/* Campo Contraseña */}
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="•••••••• (mín. 6 caracteres)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="h-12"
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="•••••••• (mín. 6 caracteres)"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="h-12 pr-10"
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
             
+            {/* Campo Confirmar Contraseña */}
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="h-12"
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="h-12 pr-10"
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
 
             <Button type="submit" className="w-full h-12" size="lg" disabled={isLoading}>

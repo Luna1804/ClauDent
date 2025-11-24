@@ -1,6 +1,6 @@
-// (NUEVO ARCHIVO) src/components/ServiciosPaquetes.tsx
+// src/components/ServiciosPaquetes.tsx (CANTIDADES Y SUMA/RESTA)
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Edit, Trash2, X } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, X, Check, History, ChevronsUpDown, Minus } from 'lucide-react';
 import { useApp, Paquete, Service } from '@/state/AppContext';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -27,18 +27,33 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 
-// Tipo para el formulario de Paquete
-type FormDataPaquete = Omit<Paquete, 'id' | 'serviciosIncluidos'> & {
-  serviciosIncluidos: Service[]; // Usamos el objeto Service completo para el formulario
+// ¡MODIFICADO! Tipo local con 'cantidad'
+type ServiceWithQuantity = Service & { cantidad: number };
+
+type FormDataPaquete = Omit<Paquete, 'id' | 'serviciosIncluidos' | 'precioTotal'> & {
+  serviciosIncluidos: ServiceWithQuantity[]; // Usamos el tipo extendido
+  precioTotal: string | number; 
 };
 
 const ServiciosPaquetes: React.FC = () => {
   const { 
-    services, // Lista de servicios individuales para elegir
+    services, 
     paquetes, 
     paquetesLoading, 
     addPaquete, 
@@ -51,9 +66,13 @@ const ServiciosPaquetes: React.FC = () => {
   const [editingPaquete, setEditingPaquete] = useState<Paquete | null>(null);
   const [isFormLoading, setIsFormLoading] = useState(false);
   
+  const [openCombobox, setOpenCombobox] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState('');
+  const [recentServices, setRecentServices] = useState<Service[]>([]);
+  
   const [formData, setFormData] = useState<FormDataPaquete>({
     nombre: '',
-    precioTotal: 0,
+    precioTotal: '',
     fechaInicio: '',
     fechaFin: '',
     serviciosIncluidos: [],
@@ -66,16 +85,35 @@ const ServiciosPaquetes: React.FC = () => {
     );
   }, [paquetes, searchQuery]);
 
+  const modalFilteredServices = useMemo(() => {
+     if (!serviceSearch.trim()) {
+         return recentServices; 
+     }
+     const searchLower = serviceSearch.toLowerCase();
+     return services.filter(s => 
+        s.nombre.toLowerCase().includes(searchLower) ||
+        (s.codigo && s.codigo.toLowerCase().includes(searchLower))
+     ).slice(0, 20);
+  }, [services, serviceSearch, recentServices]);
+
   const handleOpenDialog = (paquete?: Paquete) => {
+    setServiceSearch(''); 
     if (paquete) {
-      // Mapear los IDs guardados al objeto Service completo
+      // Mapear los datos guardados (que ya tienen cantidad) al formulario
       const serviciosCompletos = paquete.serviciosIncluidos
-        .map(sIncluido => services.find(s => s.id === sIncluido.servicioId))
-        .filter(Boolean) as Service[];
+        .map(sIncluido => {
+            const originalService = services.find(s => s.id === sIncluido.servicioId);
+            if (!originalService) return null;
+            return { 
+                ...originalService, 
+                cantidad: sIncluido.cantidad || 1 // Recuperar cantidad
+            };
+        })
+        .filter(Boolean) as ServiceWithQuantity[];
 
       setFormData({
         nombre: paquete.nombre,
-        precioTotal: paquete.precioTotal,
+        precioTotal: paquete.precioTotal, 
         fechaInicio: paquete.fechaInicio,
         fechaFin: paquete.fechaFin,
         serviciosIncluidos: serviciosCompletos,
@@ -85,7 +123,7 @@ const ServiciosPaquetes: React.FC = () => {
     } else {
       setFormData({
         nombre: '',
-        precioTotal: 0,
+        precioTotal: '', 
         fechaInicio: new Date().toISOString().split('T')[0],
         fechaFin: new Date().toISOString().split('T')[0],
         serviciosIncluidos: [],
@@ -96,22 +134,56 @@ const ServiciosPaquetes: React.FC = () => {
     setIsDialogOpen(true);
   };
   
-  // Lógica para añadir/quitar servicios del paquete en el formulario
-  const toggleServicioEnPaquete = (servicio: Service, isChecked: boolean) => {
-    setFormData(prev => {
-      const yaExiste = prev.serviciosIncluidos.some(s => s.id === servicio.id);
-      let nuevosServicios: Service[] = [];
-      if (isChecked) {
-        if (!yaExiste) {
-          nuevosServicios = [...prev.serviciosIncluidos, servicio];
-        } else {
-          nuevosServicios = prev.serviciosIncluidos;
-        }
-      } else {
-        nuevosServicios = prev.serviciosIncluidos.filter(s => s.id !== servicio.id);
-      }
-      return { ...prev, serviciosIncluidos: nuevosServicios };
-    });
+  // ¡MODIFICADO! Añadir o Incrementar
+  const addServicio = (servicio: Service) => {
+      setFormData(prev => {
+          const existingIndex = prev.serviciosIncluidos.findIndex(s => s.id === servicio.id);
+          
+          let nuevosServicios = [...prev.serviciosIncluidos];
+          
+          if (existingIndex >= 0) {
+              // Si ya existe, incrementamos la cantidad
+              nuevosServicios[existingIndex] = {
+                  ...nuevosServicios[existingIndex],
+                  cantidad: nuevosServicios[existingIndex].cantidad + 1
+              };
+          } else {
+              // Si no existe, lo añadimos con cantidad 1
+              nuevosServicios.push({ ...servicio, cantidad: 1 });
+          }
+          
+          return { ...prev, serviciosIncluidos: nuevosServicios };
+      });
+
+      setRecentServices(prev => {
+          const filtered = prev.filter(s => s.id !== servicio.id);
+          return [servicio, ...filtered].slice(0, 5);
+      });
+
+      setOpenCombobox(false);
+      setServiceSearch('');
+  };
+
+  // ¡NUEVO! Actualizar Cantidad (+/-)
+  const updateQuantity = (servicioId: string, delta: number) => {
+      setFormData(prev => {
+          const nuevosServicios = prev.serviciosIncluidos.map(s => {
+              if (s.id === servicioId) {
+                  const newQty = Math.max(1, s.cantidad + delta); // Mínimo 1
+                  return { ...s, cantidad: newQty };
+              }
+              return s;
+          });
+          return { ...prev, serviciosIncluidos: nuevosServicios };
+      });
+  };
+
+  // Eliminar servicio
+  const removeServicio = (servicioId: string) => {
+      setFormData(prev => ({
+          ...prev,
+          serviciosIncluidos: prev.serviciosIncluidos.filter(s => s.id !== servicioId)
+      }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,14 +196,18 @@ const ServiciosPaquetes: React.FC = () => {
     }
 
     setIsFormLoading(true);
+    
+    const finalPrice = formData.precioTotal === '' ? 0 : Number(formData.precioTotal);
 
-    // Mapear los objetos Service de vuelta a la estructura de IDs
     const paqueteParaGuardar: Omit<Paquete, 'id'> = {
       ...formData,
+      precioTotal: finalPrice,
+      // Guardamos la cantidad en Firestore
       serviciosIncluidos: formData.serviciosIncluidos.map(s => ({
         servicioId: s.id,
         nombre: s.nombre,
         precioOriginal: s.precio,
+        cantidad: s.cantidad // Guardar cantidad
       })),
     };
 
@@ -204,16 +280,16 @@ const ServiciosPaquetes: React.FC = () => {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[600px]">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                 <TableRow>
-                  <TableHead>Nombre del Paquete</TableHead>
-                  <TableHead>Precio</TableHead>
-                  <TableHead>Validez</TableHead>
-                  <TableHead>Servicios</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="whitespace-nowrap">Nombre del Paquete</TableHead>
+                  <TableHead className="whitespace-nowrap">Precio</TableHead>
+                  <TableHead className="whitespace-nowrap">Validez</TableHead>
+                  <TableHead className="whitespace-nowrap">Servicios</TableHead>
+                  <TableHead className="whitespace-nowrap">Estado</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -228,16 +304,19 @@ const ServiciosPaquetes: React.FC = () => {
                 ) : (
                   filteredPaquetes.map((paquete) => (
                     <TableRow key={paquete.id}>
-                      <TableCell className="font-medium">{paquete.nombre}</TableCell>
-                      <TableCell>{formatCurrency(paquete.precioTotal)}</TableCell>
-                      <TableCell>{formatDate(paquete.fechaInicio)} - {formatDate(paquete.fechaFin)}</TableCell>
-                      <TableCell>{paquete.serviciosIncluidos.length}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{paquete.nombre}</TableCell>
+                      <TableCell className="whitespace-nowrap">{formatCurrency(paquete.precioTotal)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{formatDate(paquete.fechaInicio)} - {formatDate(paquete.fechaFin)}</TableCell>
+                      {/* Mostrar cantidad total de items (sumando cantidades) o items distintos */}
+                      <TableCell className="whitespace-nowrap">
+                          {paquete.serviciosIncluidos.reduce((acc, s) => acc + (s.cantidad || 1), 0)} items
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <Badge variant={paquete.estado === 'activo' ? 'default' : 'secondary'}>
                           {paquete.estado}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
                         <div className="flex justify-end gap-2">
                           <Button
                             variant="ghost"
@@ -267,7 +346,7 @@ const ServiciosPaquetes: React.FC = () => {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editingPaquete ? 'Editar Paquete' : 'Nuevo Paquete'}</DialogTitle>
             <DialogDescription>
@@ -275,7 +354,7 @@ const ServiciosPaquetes: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <fieldset disabled={isFormLoading} className="grid grid-cols-2 gap-6">
+            <fieldset disabled={isFormLoading} className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Columna Izquierda: Detalles del Paquete */}
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -288,13 +367,14 @@ const ServiciosPaquetes: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="paquete-precio">Precio Total (CLP) *</Label>
+                  <Label htmlFor="paquete-precio">Precio Total (MXN) *</Label>
                   <Input
                     id="paquete-precio"
                     type="number"
                     min="0"
+                    step="0.01"
                     value={formData.precioTotal}
-                    onChange={(e) => setFormData({ ...formData, precioTotal: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, precioTotal: e.target.value })}
                     required
                   />
                 </div>
@@ -338,59 +418,113 @@ const ServiciosPaquetes: React.FC = () => {
               </div>
 
               {/* Columna Derecha: Selección de Servicios */}
-              <div className="space-y-4">
-                <Label>Servicios Incluidos *</Label>
-                <Popover>
+              <div className="space-y-4 flex flex-col h-full">
+                <Label>Servicios Incluidos ({formData.serviciosIncluidos.reduce((a, b) => a + b.cantidad, 0)}) *</Label>
+                
+                <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start">
-                      {formData.serviciosIncluidos.length > 0
-                        ? `${formData.serviciosIncluidos.length} servicios seleccionados`
-                        : "Seleccionar servicios..."}
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openCombobox}
+                      className="w-full justify-between text-muted-foreground"
+                    >
+                      <span>
+                        <Plus className="h-4 w-4 inline mr-2" />
+                        Buscar y añadir servicio...
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                    <ScrollArea className="h-64">
-                      <div className="p-4 space-y-2">
-                        {services.map(service => (
-                          <Label key={service.id} className="flex items-center gap-2 font-normal">
-                            <Checkbox
-                              checked={formData.serviciosIncluidos.some(s => s.id === service.id)}
-                              onCheckedChange={(checked) => toggleServicioEnPaquete(service, !!checked)}
-                            />
-                            {service.nombre} ({formatCurrency(service.precio)})
-                          </Label>
-                        ))}
-                      </div>
-                    </ScrollArea>
+                  <PopoverContent className="w-[300px] p-0" align="start">
+                    <Command shouldFilter={false}>
+                      <CommandInput 
+                        placeholder="Buscar servicio..." 
+                        value={serviceSearch}
+                        onValueChange={setServiceSearch}
+                      />
+                      <CommandList>
+                        {modalFilteredServices.length === 0 ? (
+                            <CommandEmpty>No se encontraron servicios.</CommandEmpty>
+                        ) : (
+                            <CommandGroup heading={serviceSearch ? "Resultados" : "Recientes"}>
+                                {modalFilteredServices.map((service) => (
+                                    <CommandItem
+                                        key={service.id}
+                                        value={service.nombre}
+                                        onSelect={() => addServicio(service)}
+                                    >
+                                        <div className="flex justify-between w-full">
+                                            <span>{service.nombre}</span>
+                                            <span className="text-xs text-muted-foreground">{formatCurrency(service.precio)}</span>
+                                        </div>
+                                        <Plus className="ml-auto h-4 w-4 text-muted-foreground" />
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        )}
+                      </CommandList>
+                    </Command>
                   </PopoverContent>
                 </Popover>
-                
-                {/* Lista de servicios seleccionados */}
-                <Card className="bg-muted/50">
-                  <CardContent className="p-3">
-                    {formData.serviciosIncluidos.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center">No hay servicios seleccionados</p>
-                    ) : (
-                      <ScrollArea className="h-32">
-                        <div className="space-y-2">
-                          {formData.serviciosIncluidos.map(service => (
-                            <div key={service.id} className="flex items-center justify-between text-sm p-2 bg-background rounded">
-                              <span>{service.nombre}</span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5"
-                                onClick={() => toggleServicioEnPaquete(service, false)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
+
+                <Card className="flex-1 min-h-[200px] max-h-[300px] overflow-hidden flex flex-col bg-muted/20">
+                    <ScrollArea className="flex-1 p-2">
+                        <div className="space-y-1">
+                            {formData.serviciosIncluidos.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full py-8 text-muted-foreground text-sm">
+                                    <p>No has añadido servicios aún.</p>
+                                    <p>Usa el buscador de arriba.</p>
+                                </div>
+                            ) : (
+                                formData.serviciosIncluidos.map(service => (
+                                    <div 
+                                        key={service.id} 
+                                        className="flex items-center justify-between p-2 rounded-md border bg-background shadow-sm"
+                                    >
+                                        <div className="flex flex-col min-w-0 flex-1 mr-2">
+                                            <span className="text-sm font-medium truncate">{service.nombre}</span>
+                                            <span className="text-xs text-muted-foreground">{formatCurrency(service.precio)}</span>
+                                        </div>
+
+                                        {/* CONTROLES DE CANTIDAD */}
+                                        <div className="flex items-center gap-1 bg-muted rounded-md p-0.5">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6"
+                                                onClick={() => updateQuantity(service.id, -1)}
+                                                disabled={service.cantidad <= 1}
+                                            >
+                                                <Minus className="h-3 w-3" />
+                                            </Button>
+                                            <span className="text-xs font-mono w-6 text-center">{service.cantidad}</span>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6"
+                                                onClick={() => updateQuantity(service.id, 1)}
+                                            >
+                                                <Plus className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 ml-2"
+                                            onClick={() => removeServicio(service.id)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))
+                            )}
                         </div>
-                      </ScrollArea>
-                    )}
-                  </CardContent>
+                    </ScrollArea>
                 </Card>
               </div>
             </fieldset>

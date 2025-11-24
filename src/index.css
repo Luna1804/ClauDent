@@ -9,19 +9,19 @@ All colors MUST be HSL.
 @layer base {
   :root {
     /* Pastel dental palette - sky/emerald/sand */
-    --background: 210 40% 98%;
+    --background: 200 40% 98%; /* azul casi blanco */
     --foreground: 215 25% 20%;
 
     --card: 0 0% 100%;
     --card-foreground: 215 25% 20%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 20%;
+    --popover: 0 0% 100%; /* Antes era azulito, ahora blanco */
+    --popover-foreground: 222 47% 11%;
 
     --primary: 200 95% 65%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 160 60% 75%;
+    --secondary: 160 60% 89%;
     --secondary-foreground: 160 60% 20%;
 
     --muted: 40 30% 94%;

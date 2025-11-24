@@ -1,10 +1,10 @@
-// (NUEVO ARCHIVO) src/pages/OdontogramEditorPage.tsx
+// (ODONTOGRAMA CON HEADER DE PACIENTE)
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Odontogram, ToothState } from '@/state/AppContext';
+import { Odontogram, ToothState, useApp } from '@/state/AppContext'; // Importamos useApp
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn, formatDate } from '@/lib/utils';
+import { cn, formatDate, calculateAge } from '@/lib/utils'; // Importamos calculateAge
 import { toast } from 'sonner';
 // Importaciones de Firebase
 import { doc, onSnapshot, updateDoc, Timestamp } from 'firebase/firestore';
@@ -15,57 +15,53 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, Info, User } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Badge } from '@/components/ui/badge';
 
 // --- Definiciones de Dientes ---
-const ADULTO_UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
-const ADULTO_UPPER_LEFT = [21, 22, 23, 24, 25, 26, 27, 28];
-const ADULTO_LOWER_LEFT = [31, 32, 33, 34, 35, 36, 37, 38];
-const ADULTO_LOWER_RIGHT = [48, 47, 46, 45, 44, 43, 42, 41];
-const NINO_UPPER_RIGHT = [55, 54, 53, 52, 51];
-const NINO_UPPER_LEFT = [61, 62, 63, 64, 65];
-const NINO_LOWER_LEFT = [71, 72, 73, 74, 75];
-const NINO_LOWER_RIGHT = [85, 84, 83, 82, 81];
+const ADULTO_Q1 = [18, 17, 16, 15, 14, 13, 12, 11];
+const ADULTO_Q2 = [21, 22, 23, 24, 25, 26, 27, 28];
+const ADULTO_Q3 = [31, 32, 33, 34, 35, 36, 37, 38];
+const ADULTO_Q4 = [48, 47, 46, 45, 44, 43, 42, 41];
+
+const NINO_Q5 = [55, 54, 53, 52, 51];
+const NINO_Q6 = [61, 62, 63, 64, 65];
+const NINO_Q7 = [71, 72, 73, 74, 75];
+const NINO_Q8 = [85, 84, 83, 82, 81];
 
 // --- Definiciones de Afecciones ---
 export const AFECCIONES_LISTA = [
-  { code: '0', label: 'Sano' },
-  { code: '1', label: 'Con Caries' },
-  { code: '2', label: 'Obturado con caries' },
-  { code: '3', label: 'Obturado sin caries' },
-  { code: '4', label: 'Perdido por caries' },
-  { code: '5', label: 'Perdido por otro motivo' },
-  { code: '6', label: 'Fisura obturada' },
-  { code: '7', label: 'Soporte de puente, corona, etc.' },
-  { code: '8', label: 'Diente sin erupcionar' },
-  { code: 'T', label: 'Traumatismo' },
-  { code: '9', label: 'No registrado' },
-  { code: '11', label: 'Recesión gingival' },
-  { code: '12', label: 'Tratamiento de conductos' },
-  { code: '13', label: 'Instrumento separado en conducto' },
-  { code: '14', label: 'Bolsas periodontales' },
-  { code: '15', label: 'Fluorosis' },
-  { code: '16', label: 'Alteraciones (forma, número, etc.)' },
-  { code: '17', label: 'Lesión endoperiodontal' },
+  { code: '0', label: 'Sano', color: 'bg-green-100 text-green-800 border-green-200' },
+  { code: '1', label: 'Caries', color: 'bg-red-100 text-red-800 border-red-200' },
+  { code: '2', label: 'Obturado c/caries', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { code: '3', label: 'Obturado s/caries', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { code: '4', label: 'Perdido (caries)', color: 'bg-gray-800 text-white border-gray-900' },
+  { code: '5', label: 'Perdido (otro)', color: 'bg-gray-500 text-white border-gray-600' },
+  { code: '6', label: 'Fisura obturada', color: 'bg-indigo-100 text-indigo-800 border-indigo-200' },
+  { code: '7', label: 'Soporte puente/corona', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+  { code: '8', label: 'Sin erupcionar', color: 'bg-slate-100 text-slate-800 border-slate-200' },
+  { code: 'T', label: 'Traumatismo', color: 'bg-rose-100 text-rose-800 border-rose-200' },
+  { code: '9', label: 'No registrado', color: 'bg-zinc-100 text-zinc-800 border-zinc-200' },
+  { code: '11', label: 'Recesión gingival', color: 'bg-pink-100 text-pink-800 border-pink-200' },
+  { code: '12', label: 'Trat. Conductos', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { code: '13', label: 'Inst. separado', color: 'bg-red-50 text-red-600 border-red-100' },
+  { code: '14', label: 'Bolsa periodontal', color: 'bg-amber-100 text-amber-800 border-amber-200' },
+  { code: '15', label: 'Fluorosis', color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+  { code: '16', label: 'Alteración forma/tam', color: 'bg-violet-100 text-violet-800 border-violet-200' },
+  { code: '17', label: 'Lesión endoperio', color: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200' },
+  { code: 'LIBRE', label: 'Otro / Libre', color: 'bg-sky-100 text-sky-800 border-sky-200' },
 ];
-
-// Colores para los estados
-const AFECCION_COLORES: Record<string, string> = {
-  'default': 'bg-gray-200 hover:bg-gray-300 text-black',
-  '0': 'bg-success/50 hover:bg-success/80 text-black',
-  '1': 'bg-destructive hover:bg-destructive/80',
-  '2': 'bg-destructive/70 hover:bg-destructive',
-  '3': 'bg-primary hover:bg-primary/80',
-  '4': 'bg-muted-foreground hover:bg-muted-foreground/80',
-  '5': 'bg-muted-foreground hover:bg-muted-foreground/80',
-  'T': 'bg-orange-400 hover:bg-orange-500',
-  '12': 'bg-purple-400 hover:bg-purple-500',
-};
 
 const OdontogramEditorPage: React.FC = () => {
   const { id: patientId, odontogramaId } = useParams<{ id: string; odontogramaId: string }>();
   const navigate = useNavigate();
+  
+  // 1. Obtenemos los pacientes del contexto
+  const { patients } = useApp();
+
+  // 2. Buscamos al paciente actual
+  const patient = useMemo(() => patients.find(p => p.id === patientId), [patients, patientId]);
 
   const [odontogram, setOdontogram] = useState<Odontogram | null>(null);
   const [localDientes, setLocalDientes] = useState<Odontogram['dientes']>({});
@@ -74,11 +70,10 @@ const OdontogramEditorPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
 
-  // Cargar el odontograma específico
   useEffect(() => {
     if (!patientId || !odontogramaId) {
       toast.error("Faltan datos para cargar el odontograma.");
-      navigate('/'); // Volver al inicio si faltan IDs
+      navigate('/');
       return;
     }
 
@@ -99,7 +94,7 @@ const OdontogramEditorPage: React.FC = () => {
         setLocalNotas(odontoData.notas || '');
       } else {
         toast.error("No se pudo encontrar el odontograma.");
-        navigate(`/pacientes/${patientId}`); // Volver a la ficha
+        navigate(`/pacientes/${patientId}`);
       }
       setIsLoading(false);
     });
@@ -111,24 +106,26 @@ const OdontogramEditorPage: React.FC = () => {
     return localDientes[toothNumber] || { estados: ['0'], superficies: {} };
   };
 
-  // Lógica de Multi-selección
   const handleAfeccionChange = (afeccionCode: string, isChecked: boolean) => {
-    if (selectedTooth === null) return; // No hay diente seleccionado
+    if (selectedTooth === null) return;
 
     const currentState = getToothState(selectedTooth);
     let newEstados = [...currentState.estados];
 
     if (isChecked) {
-      if (!newEstados.includes(afeccionCode)) newEstados.push(afeccionCode);
-      if (afeccionCode !== '0' && newEstados.includes('0')) newEstados = newEstados.filter(s => s !== '0');
-      if (afeccionCode === '0') newEstados = ['0'];
+      if (afeccionCode === '0') {
+        newEstados = ['0'];
+      } else {
+        newEstados = newEstados.filter(s => s !== '0');
+        if (!newEstados.includes(afeccionCode)) newEstados.push(afeccionCode);
+      }
     } else {
       newEstados = newEstados.filter(s => s !== afeccionCode);
       if (newEstados.length === 0) newEstados = ['0'];
     }
 
-    setLocalDientes(prevDientes => ({
-      ...prevDientes,
+    setLocalDientes(prev => ({
+      ...prev,
       [selectedTooth]: {
         ...currentState,
         estados: newEstados,
@@ -136,7 +133,17 @@ const OdontogramEditorPage: React.FC = () => {
     }));
   };
 
-  // Guardar cambios
+  const handleTextoLibreChange = (text: string) => {
+    if (selectedTooth === null) return;
+    setLocalDientes(prev => ({
+        ...prev,
+        [selectedTooth]: {
+            ...prev[selectedTooth],
+            textoLibre: text
+        }
+    }));
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -147,7 +154,7 @@ const OdontogramEditorPage: React.FC = () => {
         notas: localNotas,
       });
       toast.success("Odontograma actualizado");
-      navigate(`/pacientes/${patientId}`); // Volver a la ficha
+      navigate(`/pacientes/${patientId}`);
     } catch (error) {
       console.error(error);
       toast.error("Error al guardar los cambios");
@@ -156,78 +163,103 @@ const OdontogramEditorPage: React.FC = () => {
     }
   };
 
-  // Componente de Diente
+  // Componente Diente
   const Tooth: React.FC<{ number: number }> = ({ number }) => {
     const state = getToothState(number);
-    const primaryState = state.estados[0] || '0';
-    const colorClass = AFECCION_COLORES[primaryState] || AFECCION_COLORES['default'];
     const isSelected = selectedTooth === number;
+    const isSano = state.estados.length === 1 && state.estados[0] === '0';
 
     return (
-      <button
+      <motion.div
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
         onClick={() => setSelectedTooth(number)}
         className={cn(
-          'relative h-16 w-12 rounded-lg border-2 border-border transition-all',
-          'flex flex-col items-center justify-center',
-          'focus:outline-none',
-          colorClass,
-          isSelected && 'ring-4 ring-primary ring-offset-2' // Resaltado si está seleccionado
+          "relative flex flex-col items-center p-1 cursor-pointer transition-all duration-200",
+          "w-16 h-24 sm:w-20 sm:h-28",
+          "border-2 rounded-xl bg-card shadow-sm",
+          isSelected ? "border-primary ring-2 ring-primary/20 z-10 scale-105" : "border-border hover:border-primary/50",
+          isSano && !isSelected ? "opacity-80" : "opacity-100"
         )}
-        aria-label={`Diente ${number}, estados: ${state.estados.join(', ')}`}
       >
-        <span className="text-sm font-bold text-foreground">{number}</span>
-        <span className="text-lg font-bold text-foreground/80 px-1 truncate">
-          {state.estados.join(', ')}
+        <span className="text-xs font-bold text-muted-foreground mb-1 bg-muted/50 w-full text-center rounded-t-lg py-0.5">
+            {number}
         </span>
-      </button>
+
+        <div className="flex-1 w-full flex flex-col gap-1 items-center justify-center overflow-hidden px-1">
+            {isSano ? (
+                <div className="h-full w-full bg-green-50/50 rounded flex items-center justify-center">
+                   <span className="text-green-300 text-xs">Sano</span>
+                </div>
+            ) : (
+                <div className="flex flex-wrap justify-center content-center gap-1 w-full h-full">
+                    {state.estados.map(code => {
+                        const afeccion = AFECCIONES_LISTA.find(a => a.code === code);
+                        if (!afeccion) return null;
+                        
+                        let labelToShow = afeccion.label;
+                        if (code === 'LIBRE' && state.textoLibre) {
+                            labelToShow = state.textoLibre;
+                        } else if (code === 'LIBRE') {
+                            labelToShow = '...';
+                        }
+
+                        return (
+                            <div 
+                                key={code} 
+                                className={cn(
+                                    "text-[9px] font-bold px-1 rounded border shadow-sm w-full text-center truncate",
+                                    afeccion.color
+                                )}
+                                title={code === 'LIBRE' ? state.textoLibre || afeccion.label : afeccion.label}
+                            >
+                                {labelToShow.substring(0, 8) + (labelToShow.length > 8 ? '.' : '')}
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+        </div>
+      </motion.div>
     );
   };
 
-  // Componente de Grid (para Adulto o Niño)
   const OdontogramGrid: React.FC<{ tipo: 'adulto' | 'niño' }> = ({ tipo }) => {
     const isAdulto = tipo === 'adulto';
+    const Q1 = isAdulto ? ADULTO_Q1 : NINO_Q5;
+    const Q2 = isAdulto ? ADULTO_Q2 : NINO_Q6;
+    const Q3 = isAdulto ? ADULTO_Q3 : NINO_Q7;
+    const Q4 = isAdulto ? ADULTO_Q4 : NINO_Q8;
+
     return (
-      <div className="space-y-4">
-        {/* Upper jaw */}
-        <div>
-          <p className="text-sm font-medium text-muted-foreground mb-3 text-center">Maxilar Superior</p>
-          <div className="flex justify-center gap-6">
-            <div className="flex gap-1">
-              {(isAdulto ? ADULTO_UPPER_RIGHT : NINO_UPPER_RIGHT).map((tooth) => (
-                <Tooth key={tooth} number={tooth} />
-              ))}
+      <div className="w-full overflow-x-auto pb-4">
+        <div className="min-w-max px-4 flex flex-col gap-8 items-center mx-auto">
+            {/* Maxilar Superior */}
+            <div className="flex gap-4 sm:gap-8 relative">
+                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-border -translate-x-1/2"></div>
+                <div className="flex gap-1 sm:gap-2">
+                    {Q1.map(t => <Tooth key={t} number={t} />)}
+                </div>
+                <div className="flex gap-1 sm:gap-2">
+                    {Q2.map(t => <Tooth key={t} number={t} />)}
+                </div>
             </div>
-            <div className="w-px bg-border" />
-            <div className="flex gap-1">
-              {(isAdulto ? ADULTO_UPPER_LEFT : NINO_UPPER_LEFT).map((tooth) => (
-                <Tooth key={tooth} number={tooth} />
-              ))}
+
+            {/* Maxilar Inferior */}
+            <div className="flex gap-4 sm:gap-8 relative">
+                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-border -translate-x-1/2"></div>
+                <div className="flex gap-1 sm:gap-2">
+                    {Q4.map(t => <Tooth key={t} number={t} />)}
+                </div>
+                <div className="flex gap-1 sm:gap-2">
+                    {Q3.map(t => <Tooth key={t} number={t} />)}
+                </div>
             </div>
-          </div>
-        </div>
-        <div className="border-t border-border" />
-        {/* Lower jaw */}
-        <div>
-          <p className="text-sm font-medium text-muted-foreground mb-3 text-center">Maxilar Inferior</p>
-          <div className="flex justify-center gap-6">
-            <div className="flex gap-1">
-              {(isAdulto ? ADULTO_LOWER_RIGHT : NINO_LOWER_RIGHT).map((tooth) => (
-                <Tooth key={tooth} number={tooth} />
-              ))}
-            </div>
-            <div className="w-px bg-border" />
-            <div className="flex gap-1">
-              {(isAdulto ? ADULTO_LOWER_LEFT : NINO_LOWER_LEFT).map((tooth) => (
-                <Tooth key={tooth} number={tooth} />
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     );
   };
 
-  // Estado del diente seleccionado para mostrar en el panel derecho
   const selectedToothState = useMemo(() => {
     if (selectedTooth === null) return null;
     return getToothState(selectedTooth);
@@ -235,12 +267,9 @@ const OdontogramEditorPage: React.FC = () => {
 
   if (isLoading || !odontogram) {
     return (
-      <div className="p-6">
-        <Skeleton className="h-8 w-64 mb-4" />
-        <div className="grid grid-cols-3 gap-6">
-          <Skeleton className="h-[600px] col-span-2" />
-          <Skeleton className="h-[600px] col-span-1" />
-        </div>
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-[400px] w-full rounded-xl" />
       </div>
     );
   }
@@ -249,63 +278,118 @@ const OdontogramEditorPage: React.FC = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-6 space-y-4"
+      className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-6"
     >
-      {/* --- Cabecera con botones --- */}
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={() => navigate(`/pacientes/${patientId}`)}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver a Ficha de Paciente
-        </Button>
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">Editor de Odontograma</h1>
-          <p className="text-muted-foreground">
-            {odontogram.tipo === 'adulto' ? 'Adulto' : 'Niño'} - {formatDate(odontogram.fecha)}
-          </p>
+      {/* HEADER MEJORADO */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border shadow-sm">
+        <div className="flex items-center gap-4 w-full sm:w-auto">
+            <Button variant="ghost" size="icon" onClick={() => navigate(`/pacientes/${patientId}`)}>
+            <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+                {/* 3. Mostramos el nombre del paciente si existe, sino un fallback */}
+                <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+                    <User className="h-5 w-5 text-primary" />
+                    {patient ? `${patient.nombres} ${patient.apellidos}` : 'Paciente Desconocido'}
+                </h1>
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    {patient && <span>{calculateAge(patient.fechaNacimiento)} años •</span>}
+                    <Badge variant="outline" className="capitalize">{odontogram?.tipo}</Badge>
+                    <span>• {formatDate(odontogram?.fecha || '')}</span>
+                </p>
+            </div>
         </div>
-        <Button onClick={handleSave} disabled={isSaving}>
+        <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
           <Save className="h-4 w-4 mr-2" />
           {isSaving ? 'Guardando...' : 'Guardar Cambios'}
         </Button>
       </div>
 
-      {/* --- Contenido de 2 Columnas --- */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* MAIN CONTENT */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
         
-        {/* --- Columna Izquierda: Odontograma --- */}
-        <div className="lg:col-span-2">
-          <Card className="sticky top-20"> {/* Se queda fijo al hacer scroll */}
-            <CardContent className="p-4">
-              <OdontogramGrid tipo={odontogram.tipo} />
+        {/* COLUMNA IZQ: Gráfico */}
+        <div className="xl:col-span-2 order-2 xl:order-1">
+          <Card className="border-2">
+            <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Mapa Dental</CardTitle>
+            </CardHeader>
+            <CardContent className="p-2 sm:p-6 bg-secondary/5 rounded-b-lg">
+              <OdontogramGrid tipo={odontogram?.tipo || 'adulto'} />
+              <div className="flex items-center justify-center gap-2 mt-4 text-sm text-muted-foreground">
+                 <Info className="h-4 w-4" />
+                 <span>Haz clic en un diente para editar sus afecciones.</span>
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* --- Columna Derecha: Panel de Afecciones y Notas --- */}
-        <div className="lg:col-span-1 space-y-6">
-          <Card className="sticky top-20"> {/* Se queda fijo al hacer scroll */}
-            <CardHeader>
-              <CardTitle>
-                {selectedTooth ? `Afecciones Diente ${selectedTooth}` : "Selecciona un diente"}
+        {/* COLUMNA DER: Panel de Control */}
+        <div className="xl:col-span-1 order-1 xl:order-2 space-y-6 sticky top-4">
+          
+          <Card className={cn("border-2 transition-colors", selectedTooth ? "border-primary" : "border-border")}>
+            <CardHeader className="bg-muted/30 py-3">
+              <CardTitle className="text-base flex items-center justify-between">
+                <span>
+                    {selectedTooth ? `Diente ${selectedTooth}` : "Selecciona un diente"}
+                </span>
+                {selectedTooth && <Badge>Editando</Badge>}
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {selectedTooth === null ? (
-                <p className="text-muted-foreground text-center py-10">
-                  Haz clic en un diente para ver/editar sus afecciones.
-                </p>
+                <div className="py-12 px-6 text-center text-muted-foreground flex flex-col items-center">
+                    <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                        <ArrowLeft className="h-6 w-6 text-muted-foreground opacity-50" />
+                    </div>
+                    <p>Selecciona un diente del mapa para ver y modificar sus condiciones.</p>
+                </div>
               ) : (
                 <ScrollArea className="h-[400px]">
-                  <div className="grid gap-3 p-1">
-                    {AFECCIONES_LISTA.map((afeccion) => (
-                      <Label key={afeccion.code} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted">
-                        <Checkbox
-                          checked={selectedToothState?.estados.includes(afeccion.code)}
-                          onCheckedChange={(checked) => handleAfeccionChange(afeccion.code, !!checked)}
-                        />
-                        <span className="font-medium">[{afeccion.code}]</span> {afeccion.label}
-                      </Label>
-                    ))}
+                  <div className="grid gap-1 p-2">
+                    {AFECCIONES_LISTA.map((afeccion) => {
+                        const isSelected = selectedToothState?.estados.includes(afeccion.code);
+                        return (
+                            <div key={afeccion.code}>
+                                <label
+                                    className={cn(
+                                        "flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all border",
+                                        isSelected 
+                                            ? "bg-primary/10 border-primary/50 shadow-sm" 
+                                            : "hover:bg-muted border-transparent"
+                                    )}
+                                >
+                                    <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={(checked) => handleAfeccionChange(afeccion.code, !!checked)}
+                                    />
+                                    <div className="flex-1">
+                                        <span className="font-medium text-sm">{afeccion.label}</span>
+                                    </div>
+                                    <div className={cn("w-3 h-3 rounded-full border", afeccion.color.split(' ')[0].replace('bg-', 'bg-'))} />
+                                </label>
+                                
+                                {afeccion.code === 'LIBRE' && isSelected && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        className="pl-8 pr-2 pt-2 pb-4"
+                                    >
+                                        <Label htmlFor="textoLibre" className="text-xs text-muted-foreground mb-1.5 block">
+                                            Describe la condición:
+                                        </Label>
+                                        <Textarea
+                                            id="textoLibre"
+                                            placeholder="Ej. Restauración de resina..."
+                                            className="min-h-[60px] text-sm"
+                                            value={selectedToothState?.textoLibre || ''}
+                                            onChange={(e) => handleTextoLibreChange(e.target.value)}
+                                        />
+                                    </motion.div>
+                                )}
+                            </div>
+                        );
+                    })}
                   </div>
                 </ScrollArea>
               )}
@@ -313,16 +397,17 @@ const OdontogramEditorPage: React.FC = () => {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Notas Generales</CardTitle>
+            <CardHeader className="py-3">
+              <CardTitle className="text-base">Notas Generales</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4">
               <Textarea
-                placeholder="Observaciones generales de este odontograma..."
-                rows={8}
+                placeholder="Escribe aquí observaciones generales sobre el tratamiento..."
+                rows={6}
                 value={localNotas}
                 onChange={(e) => setLocalNotas(e.target.value)}
                 disabled={isSaving}
+                className="resize-none bg-muted/30"
               />
             </CardContent>
           </Card>

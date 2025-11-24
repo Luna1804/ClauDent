@@ -1,6 +1,6 @@
 // RF06: Lista de Odontogramas (Llama a la PÁGINA de edición)
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom'; // ¡NUEVO! Importamos Link
+import { Link } from 'react-router-dom'; 
 import { useApp, Odontogram } from '@/state/AppContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,8 +32,6 @@ const PatientOdontogram: React.FC<PatientOdontogramProps> = ({ patientId }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedType, setSelectedType] = useState<'adulto' | 'niño'>('adulto');
 
-  // ¡ELIMINADO! El estado para el editor modal ya no es necesario
-  // const [editingOdontogramId, setEditingOdontogramId] = useState<string | null>(null);
 
   // Cargar la LISTA de odontogramas
   useEffect(() => {

@@ -1,8 +1,6 @@
-// RF01-RF11: Global state management with Context API
+// RF01-RF11: Global state management with Context API (CORREGIDO UPDATE QUOTATION)
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-// Importaciones de Firebase (Auth)
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
-// Importaciones de Firebase (Firestore)
 import {
   collection,
   query,
@@ -20,7 +18,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
-// --- Tus Interfaces (¡INTERFAZ 'Patient' CORREGIDA!) ---
+// --- Tus Interfaces ---
 export interface Patient {
   id: string;
   nombres: string;
@@ -31,20 +29,15 @@ export interface Patient {
   telefonoContacto?: string;
   correo: string;
   curp?: string;
-  
-  // Dirección
   direccion?: string;
   calle?: string;
   numeroExterior?: string;
   numeroInterior?: string;
   colonia?: string;
   municipio?: string;
-  estadoDireccion?: string; // <-- ¡CORREGIDO! Antes se llamaba 'estado'
-  
+  estadoDireccion?: string;
   estadoCivil?: string;
-  
-  // Campos del sistema
-  estado: 'activo' | 'inactivo'; // <-- Este es el estado del sistema (correcto)
+  estado: 'activo' | 'inactivo';
   fechaRegistro: string;
 }
 
@@ -74,6 +67,7 @@ export interface Attachment {
 }
 export interface ToothState {
   estados: string[];
+  textoLibre?: string;
   superficies: {
     oclusal?: string;
     mesial?: string;
@@ -102,7 +96,7 @@ export interface Quotation {
   items: QuotationItem[];
   descuento: number;
   total: number;
-  estado: 'borrador' | 'enviada' | 'aceptada' | 'rechazada';
+  estado: 'borrador' | 'activo' | 'inactivo';
   notas: string;
 }
 export interface Paquete {
@@ -115,11 +109,12 @@ export interface Paquete {
     servicioId: string;
     nombre: string;
     precioOriginal: number;
+    cantidad: number;
   }[];
   estado: 'activo' | 'inactivo';
 }
 
-// --- ¡NUEVO! FORMULARIOS DE HISTORIA CLÍNICA INICIAL ---
+// --- FORMULARIOS DE HISTORIA CLÍNICA INICIAL ---
 export interface IHistoriaGeneral {
   ocupacion: string;
   escolaridad: string;
@@ -225,7 +220,6 @@ export interface IHistoriaClinicaCompleta {
   cavidadOral: ICavidadOral;
 }
 
-// ¡CORREGIDO! Exportamos la variable initialState
 export const initialState: IHistoriaClinicaCompleta = {
   historiaGeneral: {
     ocupacion: '', escolaridad: '', estado_civil: '', telefono: '',
@@ -270,7 +264,6 @@ export const initialState: IHistoriaClinicaCompleta = {
     dientes_estado: '', dientes_nota: '', encia_estado: '', encia_nota: ''
   }
 };
-// --- Fin de tus interfaces ---
 
 interface AppState {
   currentUser: User | null;
@@ -288,26 +281,23 @@ interface AppState {
 
 interface AppContextType extends AppState {
   logout: () => void;
-  // Pacientes
   addPatient: (patient: Omit<Patient, 'id' | 'fechaRegistro'>) => Promise<string>;
   updatePatient: (id: string, patient: Partial<Patient>) => Promise<void>;
   deletePatient: (id: string) => Promise<void>;
-  // Servicios
   addService: (service: Omit<Service, 'id'>) => Promise<void>;
   updateService: (id: string, service: Partial<Service>) => Promise<void>;
   deleteService: (id: string) => Promise<void>;
-  // Funciones de Ficha de Paciente
   addHistoryEntry: (patientId: string, entry: Omit<HistoryEntry, 'id'>) => Promise<void>;
+  updateHistoryEntry: (patientId: string, entryId: string, updates: Partial<HistoryEntry>) => Promise<void>;
+  deleteHistoryEntry: (patientId: string, entryId: string) => Promise<void>;
   addOdontogram: (patientId: string, tipo: 'adulto' | 'niño') => Promise<void>;
-  // Cotizaciones
   addQuotation: (quotation: Omit<Quotation, 'id'>) => Promise<void>;
   updateQuotation: (id: string, quotation: Partial<Quotation>) => Promise<void>;
-  // Paquetes
+  deleteQuotation: (id: string) => Promise<void>;
   addPaquete: (paquete: Omit<Paquete, 'id'>) => Promise<void>;
   updatePaquete: (id: string, updates: Partial<Paquete>) => Promise<void>;
   deletePaquete: (id: string) => Promise<void>;
   setSearchQuery: (query: string) => void;
-  // Historia Inicial
   addInitialHistoryForms: (patientId: string, forms: IHistoriaClinicaCompleta) => Promise<void>;
 }
 
@@ -328,266 +318,134 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     searchQuery: '',
   });
 
-  // ¡CORREGIDO! Efecto para Auth
+  // Effects
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setState((prev) => ({
-        ...prev,
-        currentUser: user,
-        authLoading: false,
-      }));
+      setState((prev) => ({ ...prev, currentUser: user, authLoading: false }));
     });
     return () => unsubscribe();
   }, []);
 
-  // ¡CORREGIDO! Efecto para Pacientes
   useEffect(() => {
-    if (!state.currentUser) {
-      setState((prev) => ({ ...prev, patients: [], patientsLoading: false }));
-      return;
-    }
+    if (!state.currentUser) { setState((prev) => ({ ...prev, patients: [], patientsLoading: false })); return; }
     setState((prev) => ({ ...prev, patientsLoading: true }));
     const q = query(collection(db, 'pacientes'));
     const unsubscribe = onSnapshot(q, (querySnapshot: QuerySnapshot<DocumentData>) => {
       const patientsData: Patient[] = querySnapshot.docs.map((doc) => {
         const data = doc.data();
-        return {
-          id: doc.id,
-          nombres: data.nombres || '',
-          apellidos: data.apellidos || '',
-          fechaNacimiento: data.fechaNacimiento || '',
-          sexo: data.sexo || 'X',
-          telefonoPrincipal: data.telefonoPrincipal || '',
-          correo: data.correo || '',
-          estado: data.estado || 'activo',
-          estadoDireccion: data.estadoDireccion || '',
-          telefonoContacto: data.telefonoContacto || '',
-          curp: data.curp || '',
-          direccion: data.direccion || '',
-          calle: data.calle || '',
-          numeroExterior: data.numeroExterior || '',
-          numeroInterior: data.numeroInterior || '',
-          colonia: data.colonia || '',
-          municipio: data.municipio || '',
-          estadoCivil: data.estadoCivil || '',
-          fechaRegistro: data.fechaRegistro?.toDate
-            ? data.fechaRegistro.toDate().toISOString().split('T')[0]
-            : 'N/A',
-        } as Patient;
+        return { id: doc.id, ...data, fechaRegistro: data.fechaRegistro?.toDate ? data.fechaRegistro.toDate().toISOString().split('T')[0] : 'N/A' } as Patient;
       });
-      setState((prev) => ({
-        ...prev,
-        patients: patientsData,
-        patientsLoading: false,
-      }));
+      setState((prev) => ({ ...prev, patients: patientsData, patientsLoading: false }));
     });
     return () => unsubscribe();
   }, [state.currentUser]);
 
-  // ¡CORREGIDO! Efecto para Servicios
   useEffect(() => {
-    if (!state.currentUser) {
-      setState((prev) => ({ ...prev, services: [], servicesLoading: false }));
-      return;
-    }
+    if (!state.currentUser) { setState((prev) => ({ ...prev, services: [], servicesLoading: false })); return; }
     setState((prev) => ({ ...prev, servicesLoading: true }));
     const q = query(collection(db, 'servicios'));
     const unsubscribe = onSnapshot(q, (querySnapshot: QuerySnapshot<DocumentData>) => {
-      const servicesData: Service[] = querySnapshot.docs.map((doc) => {
-        return {
-          id: doc.id,
-          ...doc.data(),
-        } as Service;
-      });
-      setState((prev) => ({
-        ...prev,
-        services: servicesData,
-        servicesLoading: false,
-      }));
+      const servicesData: Service[] = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Service));
+      setState((prev) => ({ ...prev, services: servicesData, servicesLoading: false }));
     });
     return () => unsubscribe();
   }, [state.currentUser]);
 
-  // ¡CORREGIDO! Efecto para Cotizaciones
   useEffect(() => {
-    if (!state.currentUser) {
-      setState((prev) => ({ ...prev, quotations: [], quotationsLoading: false }));
-      return;
-    }
+    if (!state.currentUser) { setState((prev) => ({ ...prev, quotations: [], quotationsLoading: false })); return; }
     setState((prev) => ({ ...prev, quotationsLoading: true }));
     const q = query(collection(db, 'cotizaciones'), orderBy('fecha', 'desc'));
     const unsubscribe = onSnapshot(q, (querySnapshot: QuerySnapshot<DocumentData>) => {
       const quotationsData: Quotation[] = querySnapshot.docs.map((doc) => {
         const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          fecha: data.fecha?.toDate ? data.fecha.toDate().toISOString().split('T')[0] : 'N/A',
-          notas: data.notas || '',
-          items: data.items || [],
-        } as Quotation;
+        return { id: doc.id, ...data, fecha: data.fecha?.toDate ? data.fecha.toDate().toISOString().split('T')[0] : 'N/A' } as Quotation;
       });
-      setState((prev) => ({
-        ...prev,
-        quotations: quotationsData,
-        quotationsLoading: false,
-      }));
+      setState((prev) => ({ ...prev, quotations: quotationsData, quotationsLoading: false }));
     });
     return () => unsubscribe();
   }, [state.currentUser]);
 
-  // ¡CORREGIDO! Efecto para Paquetes
   useEffect(() => {
-    if (!state.currentUser) {
-      setState((prev) => ({ ...prev, paquetes: [], paquetesLoading: false }));
-      return;
-    }
+    if (!state.currentUser) { setState((prev) => ({ ...prev, paquetes: [], paquetesLoading: false })); return; }
     setState((prev) => ({ ...prev, paquetesLoading: true }));
     const q = query(collection(db, 'paquetes'), orderBy('nombre', 'asc'));
     const unsubscribe = onSnapshot(q, (querySnapshot: QuerySnapshot<DocumentData>) => {
       const paquetesData: Paquete[] = querySnapshot.docs.map((doc) => {
         const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          fechaInicio: data.fechaInicio?.toDate ? data.fechaInicio.toDate().toISOString().split('T')[0] : 'N/A',
-          fechaFin: data.fechaFin?.toDate ? data.fechaFin.toDate().toISOString().split('T')[0] : 'N/A',
-        } as Paquete;
+        return { id: doc.id, ...data, fechaInicio: data.fechaInicio?.toDate ? data.fechaInicio.toDate().toISOString().split('T')[0] : 'N/A', fechaFin: data.fechaFin?.toDate ? data.fechaFin.toDate().toISOString().split('T')[0] : 'N/A' } as Paquete;
       });
-      setState((prev) => ({
-        ...prev,
-        paquetes: paquetesData,
-        paquetesLoading: false,
-      }));
+      setState((prev) => ({ ...prev, paquetes: paquetesData, paquetesLoading: false }));
     });
     return () => unsubscribe();
   }, [state.currentUser]);
 
+  const logout = () => { signOut(auth); };
 
-  // ¡CORREGIDO! Logout
-  const logout = () => {
-    signOut(auth);
-  };
-
-  // ¡CORREGIDO! addPatient
+  // CRUDs
   const addPatient = async (patient: Omit<Patient, 'id' | 'fechaRegistro'>): Promise<string> => {
-    const newDocRef = await addDoc(collection(db, 'pacientes'), {
-      ...patient,
-      fechaRegistro: serverTimestamp(),
-    });
+    const newDocRef = await addDoc(collection(db, 'pacientes'), { ...patient, fechaRegistro: serverTimestamp() });
     return newDocRef.id;
   };
-  // ¡CORREGIDO! updatePatient
-  const updatePatient = async (id: string, updates: Partial<Patient>) => {
-    const patientRef = doc(db, 'pacientes', id);
-    await updateDoc(patientRef, updates);
+  const updatePatient = async (id: string, updates: Partial<Patient>) => { await updateDoc(doc(db, 'pacientes', id), updates); };
+  const deletePatient = async (id: string) => { await deleteDoc(doc(db, 'pacientes', id)); };
+  const addService = async (service: Omit<Service, 'id'>) => { await addDoc(collection(db, 'servicios'), { ...service, fechaCreacion: serverTimestamp() }); };
+  const updateService = async (id: string, updates: Partial<Service>) => { await updateDoc(doc(db, 'servicios', id), updates); };
+  const deleteService = async (id: string) => { await deleteDoc(doc(db, 'servicios', id)); };
+  const addHistoryEntry = async (patientId: string, entry: Omit<HistoryEntry, 'id'>) => { await addDoc(collection(db, 'pacientes', patientId, 'historial'), { ...entry, fecha: new Date(entry.fecha + "T00:00:00") }); };
+  const updateHistoryEntry = async (patientId: string, entryId: string, updates: Partial<HistoryEntry>) => {
+    const entryRef = doc(db, 'pacientes', patientId, 'historial', entryId);
+    const firestoreUpdates: any = { ...updates };
+    if (updates.fecha) firestoreUpdates.fecha = new Date(updates.fecha + "T00:00:00");
+    await updateDoc(entryRef, firestoreUpdates);
   };
-  // ¡CORREGIDO! deletePatient
-  const deletePatient = async (id: string) => {
-    const patientRef = doc(db, 'pacientes', id);
-    await deleteDoc(patientRef);
+  const deleteHistoryEntry = async (patientId: string, entryId: string) => { await deleteDoc(doc(db, 'pacientes', patientId, 'historial', entryId)); };
+  const addOdontogram = async (patientId: string, tipo: 'adulto' | 'niño') => { await addDoc(collection(db, 'pacientes', patientId, 'odontograma'), { fecha: serverTimestamp(), tipo, dientes: {}, notas: "" }); };
+  
+  // --- QUOTATIONS ---
+  const addQuotation = async (quotation: Omit<Quotation, 'id'>) => { 
+    await addDoc(collection(db, 'cotizaciones'), { ...quotation, fecha: new Date(quotation.fecha + "T00:00:00") }); 
   };
-
-  // ¡CORREGIDO! CRUD Servicios
-  const addService = async (service: Omit<Service, 'id'>) => {
-    await addDoc(collection(db, 'servicios'), {
-      ...service,
-      fechaCreacion: serverTimestamp(),
-    });
-  };
-  const updateService = async (id: string, updates: Partial<Service>) => {
-    const serviceRef = doc(db, 'servicios', id);
-    await updateDoc(serviceRef, updates);
-  };
-  const deleteService = async (id: string) => {
-    const serviceRef = doc(db, 'servicios', id);
-    await deleteDoc(serviceRef);
-  };
-
-  // ¡CORREGIDO! Funciones Ficha Paciente
-  const addHistoryEntry = async (patientId: string, entry: Omit<HistoryEntry, 'id'>) => {
-    const historyRef = collection(db, 'pacientes', patientId, 'historial');
-    await addDoc(historyRef, {
-      ...entry,
-      fecha: new Date(entry.fecha + "T00:00:00")
-    });
-  };
-  const addOdontogram = async (patientId: string, tipo: 'adulto' | 'niño') => {
-    const odontogramRef = collection(db, 'pacientes', patientId, 'odontograma');
-    await addDoc(odontogramRef, {
-      fecha: serverTimestamp(),
-      tipo: tipo,
-      dientes: {},
-      notas: ""
-    });
-  };
-
-  // ¡CORREGIDO! CRUD Cotizaciones
-  const addQuotation = async (quotation: Omit<Quotation, 'id'>) => {
-    const quotationsRef = collection(db, 'cotizaciones');
-    await addDoc(quotationsRef, {
-      ...quotation,
-      fecha: new Date(quotation.fecha + "T00:00:00")
-    });
-  };
+  
+  // ¡CORREGIDO! Update quotation robusto
   const updateQuotation = async (id: string, updates: Partial<Quotation>) => {
     const quotationRef = doc(db, 'cotizaciones', id);
-    const firestoreUpdates: Partial<Quotation> | DocumentData = { ...updates };
+    const firestoreUpdates: any = { ...updates };
+    // Manejo seguro de la fecha
     if (updates.fecha) {
-      firestoreUpdates.fecha = new Date(updates.fecha + "T00:00:00");
+        // Asegurarse que sea string "YYYY-MM-DD" antes de convertir
+        const dateStr = typeof updates.fecha === 'string' ? updates.fecha : new Date().toISOString().split('T')[0];
+        firestoreUpdates.fecha = new Date(dateStr + "T00:00:00");
     }
     await updateDoc(quotationRef, firestoreUpdates);
   };
   
-  // ¡CORREGIDO! CRUD Paquetes
-  const addPaquete = async (paquete: Omit<Paquete, 'id'>) => {
-    await addDoc(collection(db, 'paquetes'), {
-      ...paquete,
-      fechaInicio: new Date(paquete.fechaInicio + "T00:00:00"),
-      fechaFin: new Date(paquete.fechaFin + "T00:00:00"),
-      fechaCreacion: serverTimestamp(),
-    });
-  };
+  const deleteQuotation = async (id: string) => { await deleteDoc(doc(db, 'cotizaciones', id)); };
+
+  const addPaquete = async (paquete: Omit<Paquete, 'id'>) => { await addDoc(collection(db, 'paquetes'), { ...paquete, fechaInicio: new Date(paquete.fechaInicio + "T00:00:00"), fechaFin: new Date(paquete.fechaFin + "T00:00:00"), fechaCreacion: serverTimestamp() }); };
   const updatePaquete = async (id: string, updates: Partial<Paquete>) => {
     const paqueteRef = doc(db, 'paquetes', id);
-    const firestoreUpdates: Partial<Paquete> | DocumentData = { ...updates };
-    if (updates.fechaInicio) {
-      firestoreUpdates.fechaInicio = new Date(updates.fechaInicio + "T00:00:00");
-    }
-    if (updates.fechaFin) {
-      firestoreUpdates.fechaFin = new Date(updates.fechaFin + "T00:00:00");
-    }
+    const firestoreUpdates: any = { ...updates };
+    if (updates.fechaInicio) firestoreUpdates.fechaInicio = new Date(updates.fechaInicio + "T00:00:00");
+    if (updates.fechaFin) firestoreUpdates.fechaFin = new Date(updates.fechaFin + "T00:00:00");
     await updateDoc(paqueteRef, firestoreUpdates);
   };
-  const deletePaquete = async (id: string) => {
-    await deleteDoc(doc(db, 'paquetes', id));
-  };
+  const deletePaquete = async (id: string) => { await deleteDoc(doc(db, 'paquetes', id)); };
 
-  // ¡CORREGIDO! setSearchQuery
-  const setSearchQuery = (query: string) => {
-    setState((prev) => ({ ...prev, searchQuery: query }));
-  };
-
-  // ¡CORREGIDO! addInitialHistoryForms
+  const setSearchQuery = (query: string) => { setState((prev) => ({ ...prev, searchQuery: query })); };
   const addInitialHistoryForms = async (patientId: string, forms: IHistoriaClinicaCompleta) => {
     const batch = writeBatch(db);
     const basePath = `pacientes/${patientId}/historia_clinica`;
-
-    batch.set(doc(db, basePath, 'datos_generales'), forms.historiaGeneral);
-    batch.set(doc(db, basePath, 'antecedentes_hereditarios'), forms.antecedentesHereditarios);
-    batch.set(doc(db, basePath, 'antecedentes_patologicos'), forms.appPatologicos);
-    batch.set(doc(db, basePath, 'antecedentes_no_patologicos'), forms.apnp);
-    batch.set(doc(db, basePath, 'antecedentes_alergicos'), forms.alergias);
+    batch.set(doc(db, basePath, 'historiaGeneral'), forms.historiaGeneral);
+    batch.set(doc(db, basePath, 'antecedentesHereditarios'), forms.antecedentesHereditarios);
+    batch.set(doc(db, basePath, 'appPatologicos'), forms.appPatologicos);
+    batch.set(doc(db, basePath, 'apnp'), forms.apnp);
+    batch.set(doc(db, basePath, 'alergias'), forms.alergias);
     batch.set(doc(db, basePath, 'hospitalizaciones'), forms.hospitalizaciones);
-    batch.set(doc(db, basePath, 'signos_vitales'), forms.signosVitales);
-    batch.set(doc(db, basePath, 'exploracion_cabeza_cuello'), forms.exploracionCabezaCuello);
-    batch.set(doc(db, basePath, 'exploracion_atm'), forms.exploracionAtm);
-    batch.set(doc(db, basePath, 'cavidad_oral'), forms.cavidadOral);
-    
-    batch.set(doc(db, `pacientes/${patientId}`), {
-      fechaCreacionHistorial: serverTimestamp()
-    }, { merge: true });
-
+    batch.set(doc(db, basePath, 'signosVitales'), forms.signosVitales);
+    batch.set(doc(db, basePath, 'exploracionCabezaCuello'), forms.exploracionCabezaCuello);
+    batch.set(doc(db, basePath, 'exploracionAtm'), forms.exploracionAtm);
+    batch.set(doc(db, basePath, 'cavidadOral'), forms.cavidadOral);
+    batch.set(doc(db, `pacientes/${patientId}`), { fechaCreacionHistorial: serverTimestamp() }, { merge: true });
     await batch.commit();
   };
 
@@ -603,9 +461,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateService,
         deleteService,
         addHistoryEntry,
+        updateHistoryEntry,
+        deleteHistoryEntry,
         addOdontogram,
         addQuotation,
         updateQuotation,
+        deleteQuotation,
         addPaquete,
         updatePaquete,
         deletePaquete,

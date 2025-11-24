@@ -17,12 +17,13 @@ export function calculateAge(birthDate: string): number {
   return age;
 }
 
-// Format currency (CLP)
+
+// Pesos Mexicanos
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('es-CL', {
+  return new Intl.NumberFormat('es-MX', { // Cambiado de es-CL a es-MX
     style: 'currency',
-    currency: 'CLP',
-    minimumFractionDigits: 0,
+    currency: 'MXN', // Cambiado de CLP a MXN
+    minimumFractionDigits: 2, // México usa centavos
   }).format(amount);
 }
 

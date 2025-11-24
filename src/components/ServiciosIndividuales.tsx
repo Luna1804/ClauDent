@@ -37,13 +37,20 @@ const ServiciosIndividuales: React.FC = () => {
   const [editingService, setEditingService] = useState<string | null>(null);
   const [isFormLoading, setIsFormLoading] = useState(false);
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    codigo: string;
+    nombre: string;
+    descripcion: string;
+    precio: string | number;
+    categoria: string;
+    estado: 'activo' | 'inactivo';
+  }>({
     codigo: '',
     nombre: '',
     descripcion: '',
-    precio: 0,
+    precio: '',
     categoria: '',
-    estado: 'activo' as 'activo' | 'inactivo',
+    estado: 'activo',
   });
 
   const filteredServices = useMemo(() => {
@@ -73,7 +80,7 @@ const ServiciosIndividuales: React.FC = () => {
         codigo: '',
         nombre: '',
         descripcion: '',
-        precio: 0,
+        precio: '',
         categoria: '',
         estado: 'activo',
       });
@@ -86,12 +93,19 @@ const ServiciosIndividuales: React.FC = () => {
     e.preventDefault();
     setIsFormLoading(true);
     
+    const finalPrice = formData.precio === '' ? 0 : Number(formData.precio);
+
+    const payload = {
+        ...formData,
+        precio: finalPrice
+    };
+
     try {
       if (editingService) {
-        await updateService(editingService, formData);
+        await updateService(editingService, payload);
         toast.success('Servicio actualizado');
       } else {
-        await addService(formData);
+        await addService(payload);
         toast.success('Servicio creado');
       }
       setIsDialogOpen(false);
@@ -117,7 +131,7 @@ const ServiciosIndividuales: React.FC = () => {
   };
 
   const TableLoadingSkeleton = () => (
-    Array(3).fill(0).map((_, index) => (
+    Array(5).fill(0).map((_, index) => (
       <TableRow key={index}>
         <TableCell><Skeleton className="h-4 w-16" /></TableCell>
         <TableCell><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-48 mt-1" /></TableCell>
@@ -135,8 +149,8 @@ const ServiciosIndividuales: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 h-[calc(100vh-10rem)] flex flex-col">
+      <div className="flex items-center justify-between shrink-0">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -153,18 +167,19 @@ const ServiciosIndividuales: React.FC = () => {
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
+      <Card className="flex-1 flex flex-col overflow-hidden">
+        <CardContent className="p-0 flex-1 overflow-hidden">
+          {/* ¡ALTURA DINÁMICA! */}
+          <div className="h-full overflow-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                 <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Servicio</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead>Precio</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead className="whitespace-nowrap">Código</TableHead>
+                  <TableHead className="whitespace-nowrap">Servicio</TableHead>
+                  <TableHead className="whitespace-nowrap">Categoría</TableHead>
+                  <TableHead className="whitespace-nowrap">Precio</TableHead>
+                  <TableHead className="whitespace-nowrap">Estado</TableHead>
+                  <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -179,21 +194,21 @@ const ServiciosIndividuales: React.FC = () => {
                 ) : (
                   filteredServices.map((service) => (
                     <TableRow key={service.id}>
-                      <TableCell className="font-mono text-sm">{service.codigo}</TableCell>
+                      <TableCell className="font-mono text-sm whitespace-nowrap">{service.codigo}</TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{service.nombre}</p>
-                          <p className="text-sm text-muted-foreground">{service.descripcion}</p>
+                          <p className="font-medium whitespace-nowrap">{service.nombre}</p>
+                          <p className="text-sm text-muted-foreground line-clamp-1">{service.descripcion}</p>
                         </div>
                       </TableCell>
-                      <TableCell>{service.categoria}</TableCell>
-                      <TableCell className="font-semibold">{formatCurrency(service.precio)}</TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap">{service.categoria}</TableCell>
+                      <TableCell className="font-semibold whitespace-nowrap">{formatCurrency(service.precio)}</TableCell>
+                      <TableCell className="whitespace-nowrap">
                         <Badge variant={service.estado === 'activo' ? 'default' : 'secondary'}>
                           {service.estado}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
                         <div className="flex justify-end gap-2">
                           <Button
                             variant="ghost"
@@ -274,15 +289,14 @@ const ServiciosIndividuales: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="precio">Precio (CLP) *</Label>
-                  {/* --- ¡CORREGIDO! --- */}
+                  <Label htmlFor="precio">Precio (MXN) *</Label>
                   <Input
                     id="precio"
                     type="number"
                     min="0"
-                    step="0.01" // <-- AÑADIDO
+                    step="0.01" 
                     value={formData.precio}
-                    onChange={(e) => setFormData({ ...formData, precio: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => setFormData({ ...formData, precio: e.target.value })}
                     required
                   />
                 </div>

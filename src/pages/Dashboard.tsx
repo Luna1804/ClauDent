@@ -1,6 +1,6 @@
-// RF11: Dashboard (CORREGIDO)
+// RF11: Dashboard (RESPONSIVE TABLET)
 import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Users, Stethoscope, FileText, TrendingUp, Search, Package } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useApp } from '@/state/AppContext';
@@ -12,12 +12,11 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
 const Dashboard: React.FC = () => {
-  // ¡CORREGIDO! patientsLoading se importa aquí
   const { patients, services, quotations, currentUser, paquetes, paquetesLoading, patientsLoading } = useApp();
+  const navigate = useNavigate();
   
   const [searchQuery, setSearchQuery] = useState('');
 
-  // (Stats - sin cambios)
   const stats = [
     {
       title: 'Total Pacientes',
@@ -45,10 +44,8 @@ const Dashboard: React.FC = () => {
     },
   ];
 
-  // (recentPatients - sin cambios)
-  const recentPatients = patients.slice(0, 3);
+  const recentPatients = patients.slice(0, 10); 
 
-  // (Paquetes Activos - sin cambios)
   const today = new Date().toISOString().split('T')[0];
   const activePaquetes = useMemo(() => {
     return paquetes.filter(p =>
@@ -70,7 +67,7 @@ const Dashboard: React.FC = () => {
         </p>
       </div>
 
-      {/* Stats Cards (Sin cambios) */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
@@ -104,7 +101,7 @@ const Dashboard: React.FC = () => {
         })}
       </div>
 
-      {/* Quick Actions (Sin cambios) */}
+      {/* Quick Actions */}
       <Card>
         <CardHeader>
           <CardTitle>Accesos Rápidos</CardTitle>
@@ -132,15 +129,18 @@ const Dashboard: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* ¡CORREGIDO! Paquetes Activos */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle>Paquetes Activos</CardTitle>
-              <CardDescription>Promociones vigentes</CardDescription>
+      <div className="flex flex-col gap-6">
+        
+        {/* 1. Paquetes Activos */}
+        <Card className="h-[400px] flex flex-col overflow-hidden">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle>Paquetes Activos</CardTitle>
+                <CardDescription>Promociones vigentes</CardDescription>
+              </div>
             </div>
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full mt-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
@@ -150,102 +150,103 @@ const Dashboard: React.FC = () => {
                 className="pl-10"
               />
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {paquetesLoading ? (
-              // ¡CORREGIDO! Esqueleto rellenado
-              Array(2).fill(0).map((_, i) => (
-                <div key={i} className="flex items-center justify-between p-4 rounded-2xl">
-                  <div className="flex items-center gap-3">
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className="space-y-1">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-40" />
+          </CardHeader>
+          <CardContent className="flex-1 overflow-hidden p-0">
+            <div className="h-full overflow-auto">
+              {/* Contenedor interno ancho para evitar aplastamiento en tablet */}
+              <div className="min-w-[600px] p-6 pt-0 space-y-4">
+                {paquetesLoading ? (
+                  Array(2).fill(0).map((_, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 rounded-2xl border">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="space-y-1 flex-1 ml-4">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
                     </div>
-                  </div>
-                  <Skeleton className="h-6 w-24" />
-                </div>
-              ))
-            ) : activePaquetes.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">
-                {searchQuery ? "No se encontraron paquetes" : "No hay paquetes activos vigentes."}
-              </p>
-            ) : (
-              // ¡CORREGIDO! Contenido rellenado
-              activePaquetes.map((paquete) => (
-                <div
-                  key={paquete.id}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-2xl hover:bg-muted transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-secondary/10 flex items-center justify-center flex-shrink-0">
-                      <Package className="h-5 w-5 text-secondary" />
+                  ))
+                ) : activePaquetes.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-10">
+                    {searchQuery ? "No se encontraron paquetes" : "No hay paquetes activos vigentes."}
+                  </p>
+                ) : (
+                  activePaquetes.map((paquete) => (
+                    <div
+                      key={paquete.id}
+                      onClick={() => navigate('/servicios')}
+                      className="flex items-center justify-between p-4 rounded-2xl border hover:bg-muted transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-full bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                          <Package className="h-5 w-5 text-secondary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground truncate">
+                            {paquete.nombre}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Hasta: {formatDate(paquete.fechaFin)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 ml-4">
+                        <p className="text-lg font-bold text-foreground">{formatCurrency(paquete.precioTotal)}</p>
+                        <Badge variant="secondary" className="ml-auto w-fit block">{paquete.serviciosIncluidos.length} servicios</Badge>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">
-                        {paquete.nombre}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Vigente hasta: {formatDate(paquete.fechaFin)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-2 sm:mt-0 text-right">
-                    <p className="text-lg font-bold text-foreground">{formatCurrency(paquete.precioTotal)}</p>
-                    <Badge variant="secondary">{paquete.serviciosIncluidos.length} servicios</Badge>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                  ))
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* ¡CORREGIDO! Pacientes Recientes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pacientes Recientes</CardTitle>
-          <CardDescription>Últimos registros</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* ¡CORREGIDO! Usamos patientsLoading (que ya estaba en tu archivo) */}
-            {patientsLoading ? (
-              <p className="text-muted-foreground">Cargando pacientes...</p>
-            ) : recentPatients.length === 0 ? (
-              <p className="text-muted-foreground">No hay pacientes recientes.</p>
-            ) : (
-              recentPatients.map((patient) => (
-                <Link
-                  key={patient.id}
-                  to={`/pacientes/${patient.id}`}
-                  className="flex items-center justify-between p-4 rounded-2xl hover:bg-muted transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-primary font-semibold">
-                        {patient.nombres && patient.nombres[0]}
-                        {patient.apellidos && patient.apellidos[0]}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">
-                        {patient.nombres} {patient.apellidos}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {patient.curp || 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                </Link>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        {/* 2. Pacientes Recientes */}
+        <Card className="h-[400px] flex flex-col overflow-hidden">
+          <CardHeader>
+            <CardTitle>Pacientes Recientes</CardTitle>
+            <CardDescription>Últimos registros</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-hidden p-0">
+            <div className="h-full overflow-auto">
+              {/* Contenedor interno ancho */}
+              <div className="min-w-[600px] p-6 pt-0 space-y-4">
+                {patientsLoading ? (
+                  <p className="text-muted-foreground p-4">Cargando pacientes...</p>
+                ) : recentPatients.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-10">No hay pacientes recientes.</p>
+                ) : (
+                  recentPatients.map((patient) => (
+                    <Link
+                      key={patient.id}
+                      to={`/pacientes/${patient.id}`}
+                      className="flex items-center justify-between p-4 rounded-2xl border hover:bg-muted transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-primary font-semibold">
+                            {patient.nombres && patient.nombres[0]}
+                            {patient.apellidos && patient.apellidos[0]}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground truncate">
+                            {patient.nombres} {patient.apellidos}
+                          </p>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {patient.curp || 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+                      <TrendingUp className="h-5 w-5 text-muted-foreground shrink-0 ml-4" />
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

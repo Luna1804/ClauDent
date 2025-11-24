@@ -1,7 +1,6 @@
 // (Archivo MODIFICADO) src/components/PatientAntecedentes.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-// ¡CORREGIDO! Importamos initialState desde AppContext
 import { useApp, IHistoriaClinicaCompleta, initialState } from '@/state/AppContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,17 +10,18 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { toast } from 'sonner';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Edit } from 'lucide-react';
 
-// Importamos el modal que vamos a re-utilizar
 import InitialHistoryModal from '@/components/InitialHistoryModal';
 
-// (Componente DataViewer - sin cambios)
+// ¡CORREGIDO! Componente DataViewer
 const DataViewer: React.FC<{ data: Record<string, any>, title: string }> = ({ data, title }) => {
-  const entries = Object.entries(data).filter(([_, value]) => value && value !== '');
+  // ¡CORREGIDO! El filtro ahora solo oculta 'null' o 'undefined',
+  // pero SÍ permite 'false' (para los checkbox) y '""' (para texto vacío).
+  const entries = Object.entries(data).filter(([_, value]) => value !== null && value !== undefined);
 
   if (entries.length === 0) {
     return (
@@ -31,13 +31,25 @@ const DataViewer: React.FC<{ data: Record<string, any>, title: string }> = ({ da
     );
   }
 
+  // ¡NUEVO! Función para mostrar el valor correctamente
+  const getDisplayValue = (value: any): string => {
+    if (typeof value === 'boolean') {
+      return value ? 'Sí' : 'No';
+    }
+    if (value === '') {
+      return 'N/A'; // Mostramos N/A para campos de texto vacíos
+    }
+    return value.toString();
+  };
+
   return (
     <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
       {entries.map(([key, value]) => (
         <div key={key} className="flex flex-col">
           <span className="text-xs font-medium text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</span>
+          {/* ¡CORREGIDO! Usamos la nueva función para mostrar el valor */}
           <span className="text-sm font-semibold">
-            {typeof value === 'boolean' ? (value ? 'Sí' : 'No') : value.toString()}
+            {getDisplayValue(value)}
           </span>
         </div>
       ))}
@@ -47,11 +59,11 @@ const DataViewer: React.FC<{ data: Record<string, any>, title: string }> = ({ da
 
 const PatientAntecedentes: React.FC = () => {
   const { id: patientId } = useParams<{ id: string }>();
-  // ¡CORREGIDO! Usamos el 'initialState' importado
-  const [historyData, setHistoryData] = useState<IHistoriaClinicaCompleta | null>(initialState);
+  const [historyData, setHistoryData] = useState<IHistoriaClinicaCompleta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // ¡MODIFICADO! Este useEffect ahora mapea correctamente los IDs de la BD
   useEffect(() => {
     if (!patientId) return;
 
@@ -61,16 +73,57 @@ const PatientAntecedentes: React.FC = () => {
         const historyRef = collection(db, 'pacientes', patientId, 'historia_clinica');
         const querySnapshot = await getDocs(historyRef);
         
-        let fullData: IHistoriaClinicaCompleta = { ...initialState };
+        let fullData: IHistoriaClinicaCompleta = JSON.parse(JSON.stringify(initialState)); // Copia profunda
         
         if (querySnapshot.empty) {
           console.log("No hay historia clínica inicial para este paciente.");
           // Se quedará con 'initialState' (vacío)
         } else {
+          // ¡CORREGIDO! Mapeamos los IDs (snake_case Y camelCase) a las llaves (camelCase)
           querySnapshot.forEach((doc) => {
-            // Asignamos cada documento (ej. 'datos_generales') a su llave
-            // @ts-ignore
-            fullData[doc.id as keyof IHistoriaClinicaCompleta] = doc.data();
+            const data = doc.data();
+            switch (doc.id) {
+              case 'historiaGeneral':
+              case 'datos_generales':
+                fullData.historiaGeneral = { ...initialState.historiaGeneral, ...data };
+                break;
+              case 'antecedentesHereditarios':
+              case 'antecedentes_hereditarios':
+                fullData.antecedentesHereditarios = { ...initialState.antecedentesHereditarios, ...data };
+                break;
+              case 'appPatologicos':
+              case 'antecedentes_patologicos':
+                fullData.appPatologicos = { ...initialState.appPatologicos, ...data };
+                break;
+              case 'apnp':
+              case 'antecedentes_no_patologicos':
+                fullData.apnp = { ...initialState.apnp, ...data };
+                break;
+              case 'alergias':
+              case 'antecedentes_alergicos':
+                fullData.alergias = { ...initialState.alergias, ...data };
+                break;
+              case 'hospitalizaciones':
+                fullData.hospitalizaciones = { ...initialState.hospitalizaciones, ...data };
+                break;
+              case 'signosVitales':
+              case 'signos_vitales':
+                fullData.signosVitales = { ...initialState.signosVitales, ...data };
+                break;
+              case 'exploracionCabezaCuello':
+              case 'exploracion_cabeza_cuello':
+                fullData.exploracionCabezaCuello = { ...initialState.exploracionCabezaCuello, ...data };
+                break;
+              case 'exploracionAtm':
+              case 'exploracion_atm':
+                fullData.exploracionAtm = { ...initialState.exploracionAtm, ...data };
+                break;
+
+              case 'cavidadOral':
+              case 'cavidad_oral':
+                fullData.cavidadOral = { ...initialState.cavidadOral, ...data };
+                break;
+            }
           });
         }
         setHistoryData(fullData);
@@ -83,7 +136,8 @@ const PatientAntecedentes: React.FC = () => {
     };
 
     fetchHistoryData();
-  }, [patientId]);
+  // Recargamos cuando se cierra el modal
+  }, [patientId, isModalOpen]); 
 
   if (isLoading) {
     return (
@@ -109,7 +163,6 @@ const PatientAntecedentes: React.FC = () => {
         </Button>
       </div>
 
-      {/* ¡CORREGIDO! 'collapsible' eliminado */}
       <Accordion type="multiple" className="w-full">
         <AccordionItem value="item-1">
           <AccordionTrigger>1. Datos Generales (Historia Clínica)</AccordionTrigger>
@@ -179,7 +232,6 @@ const PatientAntecedentes: React.FC = () => {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           patientId={patientId}
-          // ¡NUEVO! Pasamos los datos cargados para rellenar el formulario
           initialData={historyData} 
         />
       )}

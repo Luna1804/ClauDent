@@ -1,4 +1,4 @@
-// (NUEVO ARCHIVO) src/lib/pdfGenerator.ts
+// src/lib/pdfGenerator.ts (CORREGIDO CON NUEVOS CAMPOS DE PACIENTE)
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Quotation, Patient } from "@/state/AppContext";
@@ -34,14 +34,16 @@ export const generateQuotationPDF = (
   y += 7;
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
+  
   if (patient) {
-    doc.text(`Nombre: ${patient.nombre} ${patient.apellido}`, 20, y);
-    doc.text(`RUT: ${patient.rut}`, pageWidth / 2, y);
+    // ¡CORREGIDO! Usamos los nuevos nombres de campos
+    doc.text(`Nombre: ${patient.nombres} ${patient.apellidos}`, 20, y);
+    doc.text(`CURP: ${patient.curp || 'N/A'}`, pageWidth / 2, y);
     y += 6;
-    doc.text(`Email: ${patient.email}`, 20, y);
-    doc.text(`Teléfono: ${patient.telefono}`, pageWidth / 2, y);
+    doc.text(`Email: ${patient.correo}`, 20, y);
+    doc.text(`Teléfono: ${patient.telefonoPrincipal}`, pageWidth / 2, y);
   } else {
-    doc.text("Paciente (ID: ${quotation.pacienteId})", 20, y);
+    doc.text(`Paciente (ID: ${quotation.pacienteId})`, 20, y);
   }
   y += 10;
 
@@ -59,7 +61,7 @@ export const generateQuotationPDF = (
     const totalItem = item.cantidad * item.precioUnitario;
     subtotal += totalItem;
     tableBody.push([
-      item.nombre, // ¡Usamos el nombre guardado en el item!
+      item.nombre, 
       item.cantidad,
       formatCurrency(item.precioUnitario),
       formatCurrency(totalItem)
@@ -127,7 +129,7 @@ export const generateQuotationPDF = (
   }
   doc.setFontSize(9);
   doc.setFont("helvetica", "italic");
-  doc.text("ClauDent - Cotización generada el " + new Date().toLocaleDateString('es-CL'), pageWidth / 2, pageHeight - 15, { align: "center" });
+  doc.text("DentalApp - Cotización generada el " + new Date().toLocaleDateString('es-MX'), pageWidth / 2, pageHeight - 15, { align: "center" });
 
   // --- 8. Guardar el PDF ---
   doc.save(`cotizacion-${quotation.id.substring(0, 6)}.pdf`);
