@@ -6,28 +6,24 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider, useApp } from "./state/AppContext";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Pacientes from "./pages/Pacientes";
 import FichaPaciente from "./pages/FichaPaciente";
 import Servicios from "./pages/Servicios";
 import Cotizaciones from "./pages/Cotizaciones";
 import NotFound from "./pages/NotFound";
-// ¡NUEVO! Importamos la nueva página
 import OdontogramEditorPage from "./pages/OdontogramEditorPage";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
-// Protected route wrapper
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser } = useApp();
   return currentUser ? <Layout>{children}</Layout> : <Navigate to="/login" />;
 };
 
-// ¡NUEVO! Wrapper de ruta para la página de odontograma (sin Layout)
 const EditorRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser } = useApp();
-  // Esta página no usa el Layout principal, pero SÍ necesita protección
   return currentUser ? <>{children}</> : <Navigate to="/login" />;
 };
 
@@ -45,18 +41,17 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={currentUser ? <Navigate to="/dashboard" /> : <Login />} />
-      <Route path="/register" element={currentUser ? <Navigate to="/dashboard" /> : <Register />} />
       
       <Route path="/" element={<Navigate to={currentUser ? "/dashboard" : "/login"} />} />
+
+      <Route path="/reset-password" element={<ResetPassword />} />
       
-      {/* Rutas con el Layout principal */}
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/pacientes" element={<ProtectedRoute><Pacientes /></ProtectedRoute>} />
       <Route path="/pacientes/:id" element={<ProtectedRoute><FichaPaciente /></ProtectedRoute>} />
       <Route path="/servicios" element={<ProtectedRoute><Servicios /></ProtectedRoute>} />
       <Route path="/cotizaciones" element={<ProtectedRoute><Cotizaciones /></ProtectedRoute>} />
       
-      {/* ¡NUEVO! Ruta para el Editor (sin Layout) */}
       <Route 
         path="/pacientes/:id/odontograma/:odontogramaId" 
         element={<EditorRoute><OdontogramEditorPage /></EditorRoute>} 
@@ -70,7 +65,6 @@ const AppRoutes = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AppProvider>
-      {/* ¡TooltipProvider se queda aquí! Es el provider global */}
       <TooltipProvider>
         <Toaster />
         <Sonner />

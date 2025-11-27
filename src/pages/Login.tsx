@@ -1,26 +1,24 @@
-// RF01: Login page (CON OJITO DE CONTRASEÑA)
+// RF01: Login page (CON RECUPERACIÓN INTEGRADA)
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Stethoscope, Eye, EyeOff } from 'lucide-react'; // Importamos iconos
+import { Stethoscope, Eye, EyeOff } from 'lucide-react'; 
 import { motion } from 'framer-motion';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+// Importamos sendPasswordResetEmail
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Link } from 'react-router-dom'; 
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  // Estado para mostrar/ocultar contraseña
   const [showPassword, setShowPassword] = useState(false);
-  
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+  // --- Iniciar Sesión ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
@@ -49,6 +47,32 @@ const Login: React.FC = () => {
     }
   };
 
+  // --- Recuperar Contraseña (¡NUEVO!) ---
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      toast.error('Por favor, escribe tu correo en el campo de Email primero.');
+      return;
+    }
+
+    const loadingToast = toast.loading('Enviando correo de recuperación...');
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.dismiss(loadingToast);
+      toast.success('¡Listo! Revisa tu correo para restablecer tu contraseña.');
+    } catch (error: any) {
+      console.error(error);
+      toast.dismiss(loadingToast);
+      let errorMessage = 'No se pudo enviar el correo.';
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No existe una cuenta con este correo.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'El formato del correo es incorrecto.';
+      }
+      toast.error(errorMessage);
+    }
+  };
+
   return (
     <div className="h-screen w-full overflow-hidden bg-gradient-to-br from-background via-muted to-accent flex items-center justify-center p-4">
       <motion.div
@@ -59,9 +83,8 @@ const Login: React.FC = () => {
       >
         <div className="bg-card rounded-3xl shadow-lg p-8 border border-border">
           <div className="flex flex-col items-center mb-8">
-            {/* LOGO: Descomenta si tienes imagen */}
-            <img src="/logo.png" alt="ClauDent" className="w-36 object-contain mb-4" />
-            
+            <img src="/logo.png" alt="ClauDent" className="w-36 object-contain mb-4" /> 
+          
             <h1 className="text-3xl font-bold text-foreground mb-2">ClauDent</h1>
             <p className="text-muted-foreground text-center">
               Sistema de Gestión Dental
@@ -85,21 +108,33 @@ const Login: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Contraseña</Label>
+                
+                {/* BOTÓN DE RECUPERACIÓN DIRECTA */}
+                <button 
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="text-xs text-primary hover:underline font-medium focus:outline-none"
+                  disabled={isLoading}
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
+              
               <div className="relative">
                 <Input
                   id="password"
-                  // Alternamos entre 'text' y 'password'
                   type={showPassword ? "text" : "password"} 
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="h-12 pr-10" // Espacio a la derecha para el ícono
+                  className="h-12 pr-10"
                   disabled={isLoading}
                 />
                 <button
-                  type="button" // Importante para no enviar el formulario
+                  type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
                   tabIndex={-1}
@@ -116,13 +151,6 @@ const Login: React.FC = () => {
             <Button type="submit" className="w-full h-12" size="lg" disabled={isLoading}>
               {isLoading ? 'Iniciando...' : 'Iniciar Sesión'}
             </Button>
-
-            <p className="text-sm text-muted-foreground text-center">
-              ¿No tienes una cuenta?{' '}
-              <Link to="/register" className="text-primary hover:underline font-medium">
-                Regístrate aquí
-              </Link>
-            </p>
           </form>
         </div>
       </motion.div>
