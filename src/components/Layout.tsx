@@ -1,4 +1,4 @@
-// Main layout (LOGO MÁS GRANDE)
+// src/components/Layout.tsx (SIDEBAR FULL HEIGHT FIXED)
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
@@ -48,17 +48,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { currentUser, logout, patients } = useApp(); 
 
   const [recentSearches, setRecentSearches] = useState<Patient[]>([]);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Detectar móvil para cerrar sidebar
+  // Detectar móvil para cerrar sidebar y estado inicial
   useEffect(() => {
     const handleResize = () => {
-        if (window.innerWidth < 768 && sidebarOpen) {
+        const mobile = window.innerWidth < 768;
+        setIsMobile(mobile);
+        if (mobile && sidebarOpen) {
              setSidebarOpen(false);
+        } else if (!mobile && !sidebarOpen) {
+             setSidebarOpen(true);
         }
     };
+    // Check inicial
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [sidebarOpen]);
+  }, []);
 
   // Manejo de clics fuera del buscador
   useEffect(() => {
@@ -97,14 +104,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const filteredPatients = patients.filter(p => {
       const searchLower = searchQuery.toLowerCase();
       return p.nombres.toLowerCase().includes(searchLower) || 
-              p.apellidos.toLowerCase().includes(searchLower) ||
-              (p.curp && p.curp.toLowerCase().includes(searchLower));
+             p.apellidos.toLowerCase().includes(searchLower) ||
+             (p.curp && p.curp.toLowerCase().includes(searchLower));
   }).slice(0, 10); 
 
   return (
-    <div className="min-h-screen bg-background w-full flex flex-col">
-      {/* Top Navigation */}
-      <header className="h-16 border-b border-border bg-card sticky top-0 z-40 flex items-center px-4 gap-4 shrink-0">
+    <div className="h-screen w-full flex flex-col bg-background overflow-hidden">
+      {/* Top Navigation (Fixed Height) */}
+      <header className="h-16 border-b border-border bg-card flex items-center px-4 gap-4 shrink-0 z-20 relative">
         <Button
           variant="ghost"
           size="icon"
@@ -115,17 +122,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </Button>
 
         <div className="flex items-center gap-3">
-          {/* --- ÁREA DEL LOGO MODIFICADA (MÁS GRANDE) --- */}
-          
-          {/* LOGO IMAGEN: Descomenta y usa esta línea. Ahora es h-12 w-12 (más grande) */}
-          <img src="/logo.png" alt="ClauDent Logo" className="w-16 object-contain rounded-md" /> 
-
+          {/* Ícono por defecto (si no tienes logo aún) */}
+          <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center">
+            <Stethoscope className="h-6 w-6 text-primary-foreground" />
+          </div>
           {/* NOMBRE DE LA EMPRESA */}
           <h1 className="text-xl font-bold text-foreground hidden sm:block">ClauDent</h1>
         </div>
 
         {/* BUSCADOR GLOBAL */}
-        <div className="flex-1 max-w-md mx-auto relative z-50" ref={searchContainerRef}>
+        <div className="flex-1 max-w-md mx-auto relative" ref={searchContainerRef}>
             <Command 
                 shouldFilter={false} 
                 className="rounded-lg border shadow-sm overflow-visible bg-background"
@@ -145,7 +151,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </div>
 
                 {showResults && (
-                    <div className="absolute top-full left-0 w-full bg-popover border rounded-b-md shadow-lg mt-1 max-h-[300px] overflow-y-auto">
+                    <div className="absolute top-full left-0 w-full bg-popover border rounded-b-md shadow-lg mt-1 max-h-[300px] overflow-y-auto z-50">
                         <CommandList>
                             {!searchQuery && recentSearches.length > 0 && (
                                 <CommandGroup heading="Recientes">
@@ -202,19 +208,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </header>
 
+      {/* Contenedor Flex que llena el resto de la pantalla */}
       <div className="flex flex-1 overflow-hidden relative">
         
-        {/* Sidebar Desktop */}
+        {/* Sidebar Desktop (ALTURA COMPLETA) */}
         <AnimatePresence mode="wait">
-          {sidebarOpen && window.innerWidth >= 768 && (
+          {sidebarOpen && !isMobile && (
             <motion.aside
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: 250, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="border-r border-border bg-sidebar h-full hidden md:block"
+              // Usamos bg-[hsl(var(--sidebar-background))] para asegurar el color correcto
+              className="border-r border-border bg-[hsl(var(--sidebar-background))] h-full hidden md:flex flex-col shrink-0"
             >
-              <nav className="p-4 space-y-2">
+              <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.path;
@@ -241,24 +249,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {/* Sidebar Mobile (Overlay) */}
         <AnimatePresence>
-          {sidebarOpen && window.innerWidth < 768 && (
+          {sidebarOpen && isMobile && (
             <>
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setSidebarOpen(false)}
-                className="fixed inset-0 bg-black/50 z-40 md:hidden"
-                style={{ top: '64px' }} 
+                className="fixed inset-0 bg-black/50 z-30 md:hidden"
+                style={{ top: '64px' }} // Debajo del header
               />
               <motion.aside
                 initial={{ x: "-100%" }}
                 animate={{ x: 0 }}
                 exit={{ x: "-100%" }}
                 transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-                className="fixed top-16 left-0 bottom-0 w-64 bg-background border-r border-border z-50 md:hidden shadow-xl"
+                className="fixed top-16 left-0 bottom-0 w-64 bg-background border-r border-border z-40 md:hidden shadow-xl flex flex-col"
               >
-                <nav className="p-4 space-y-2">
+                <nav className="p-4 space-y-2 flex-1">
                   {navItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = location.pathname === item.path;
@@ -280,14 +288,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     );
                   })}
                 </nav>
-                <div className="absolute bottom-8 left-0 w-full px-4">
-                    <div className="p-4 bg-muted/50 rounded-xl flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                <div className="p-4 border-t">
+                    <div className="bg-muted/50 rounded-xl p-3 flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
                             {currentUser?.email?.charAt(0).toUpperCase()}
                         </div>
                         <div className="overflow-hidden">
-                            <p className="text-sm font-medium truncate">{currentUser?.email}</p>
-                            <p className="text-xs text-muted-foreground">Dentista</p>
+                            <p className="text-xs font-medium truncate">{currentUser?.email}</p>
+                            <p className="text-[10px] text-muted-foreground">Dentista</p>
                         </div>
                     </div>
                 </div>
@@ -296,7 +304,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           )}
         </AnimatePresence>
         
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-secondary/10">
+        {/* Main Content (Con scroll interno) */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-secondary/10 h-full relative">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
