@@ -14,6 +14,7 @@ import Cotizaciones from "./pages/Cotizaciones";
 import NotFound from "./pages/NotFound";
 import OdontogramEditorPage from "./pages/OdontogramEditorPage";
 import ResetPassword from "./pages/ResetPassword";
+import LayoutV2 from "./components/LayoutV2";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,18 @@ const AppRoutes = () => {
       />
       
       <Route path="*" element={<NotFound />} />
+
+      <Route 
+  path="/test-layout" 
+  element={
+    <ProtectedRoute>
+      <LayoutV2>
+        <Dashboard />
+      </LayoutV2>
+    </ProtectedRoute>
+  } 
+/>
+
     </Routes>
   );
 };
