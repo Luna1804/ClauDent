@@ -13,9 +13,9 @@ import { useApp } from '@/state/AppContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
-// Componente Header Interno (Tu diseño original)
+// Componente Header Interno para poder usar el hook useSidebar
 const HeaderOriginal = () => {
-  const { toggleSidebar } = useSidebar(); 
+  const { toggleSidebar, state } = useSidebar(); // Hook para controlar el sidebar nuevo
   const { currentUser, logout, setSearchQuery } = useApp();
   const [searchInput, setSearchInput] = useState('');
   const navigate = useNavigate();
@@ -33,7 +33,7 @@ const HeaderOriginal = () => {
 
   return (
     <header className="h-16 border-b border-border bg-card sticky top-0 z-40 flex items-center px-4 gap-4 w-full">
-      {/* Botón Menú: Solo visible en PC para colapsar sidebar */}
+      {/* Botón Menú: Solo visible en PC para colapsar/expandir el sidebar */}
       <div className="hidden md:block">
         <Button
           variant="ghost"
@@ -45,6 +45,7 @@ const HeaderOriginal = () => {
         </Button>
       </div>
 
+      {/* Logo y Título (Visible siempre) */}
       <div className="flex items-center gap-2">
         <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
           <Stethoscope className="h-5 w-5 text-primary-foreground" />
@@ -52,6 +53,7 @@ const HeaderOriginal = () => {
         <h1 className="text-lg font-semibold text-foreground">ClauDent</h1>
       </div>
 
+      {/* TU BUSCADOR ORIGINAL (Visible siempre: Móvil y PC) */}
       <form onSubmit={handleSearch} className="flex-1 max-w-md mx-auto">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -66,6 +68,7 @@ const HeaderOriginal = () => {
         </div>
       </form>
 
+      {/* Usuario y Logout (Solo en PC como pediste) */}
       <div className="hidden md:flex items-center gap-3">
         <div className="text-right">
           <p className="text-sm font-medium text-foreground">{currentUser?.email}</p>
@@ -84,36 +87,31 @@ const HeaderOriginal = () => {
   );
 };
 
-// Layout Principal
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export default function LayoutV2({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider defaultOpen={true}>
-      {/* 1. Sidebar: Solo visible en escritorio */}
+      {/* Sidebar: Solo visible en Desktop (md:block) */}
       <div className="hidden md:block">
         <AppSidebar />
       </div>
 
-      {/* 2. Contenido Principal */}
+      {/* Contenedor Principal */}
       <SidebarInset className="bg-background flex flex-col min-h-screen">
         
+        {/* Tu Header Original */}
         <HeaderOriginal />
 
-        {/* Contenido:
-           - pb-24: Padding bottom grande para que el contenido no quede tapado por la barra en móvil.
-           - md:pb-6: Padding normal en escritorio.
-        */}
-        <main className="flex-1 p-4 md:p-6 pb-24 md:pb-6 overflow-y-auto w-full">
+        {/* Contenido */}
+        <main className="flex-1 p-4 md:p-6 pb-24 md:pb-6 overflow-y-auto">
            {children}
         </main>
 
-        {/* 3. Barra Inferior: DENTRO del SidebarInset para que sea visible */}
-        <div className="md:hidden block">
+        {/* Barra Inferior: Solo visible en Móvil (md:hidden) */}
+        <div className="md:hidden">
           <BottomNav />
         </div>
 
       </SidebarInset>
     </SidebarProvider>
   );
-};
-
-export default Layout;
+}
