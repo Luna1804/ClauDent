@@ -13,7 +13,7 @@ import { useApp } from '@/state/AppContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
-// Componente Header Interno
+// Componente Header Interno (Tu diseño original)
 const HeaderOriginal = () => {
   const { toggleSidebar } = useSidebar(); 
   const { currentUser, logout, setSearchQuery } = useApp();
@@ -33,7 +33,7 @@ const HeaderOriginal = () => {
 
   return (
     <header className="h-16 border-b border-border bg-card sticky top-0 z-40 flex items-center px-4 gap-4 w-full">
-      {/* Botón Menú: Solo visible en PC */}
+      {/* Botón Menú: Solo visible en PC para colapsar sidebar */}
       <div className="hidden md:block">
         <Button
           variant="ghost"
@@ -88,27 +88,30 @@ const HeaderOriginal = () => {
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <SidebarProvider defaultOpen={true}>
-      {/* 1. Sidebar: Solo escritorio */}
+      {/* 1. Sidebar: Solo visible en escritorio */}
       <div className="hidden md:block">
         <AppSidebar />
       </div>
 
-      {/* 2. Contenido Principal (SidebarInset) */}
-      <SidebarInset className="bg-background flex flex-col min-h-screen mb-16 md:mb-0"> 
-        {/* ^^^ OJO: Agregué mb-16 en móvil para que el contenido no quede tapado por la barra */}
+      {/* 2. Contenido Principal */}
+      <SidebarInset className="bg-background flex flex-col min-h-screen">
         
         <HeaderOriginal />
 
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+        {/* Contenido:
+           - pb-24: Padding bottom grande para que el contenido no quede tapado por la barra en móvil.
+           - md:pb-6: Padding normal en escritorio.
+        */}
+        <main className="flex-1 p-4 md:p-6 pb-24 md:pb-6 overflow-y-auto w-full">
            {children}
         </main>
+
+        {/* 3. Barra Inferior: DENTRO del SidebarInset para que sea visible */}
+        <div className="md:hidden block">
+          <BottomNav />
+        </div>
+
       </SidebarInset>
-
-      {/* 3. Barra Inferior: FUERA del SidebarInset */}
-      <div className="md:hidden block">
-        <BottomNav />
-      </div>
-
     </SidebarProvider>
   );
 };
