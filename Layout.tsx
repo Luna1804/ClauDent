@@ -1,101 +1,121 @@
+// src/components/Layout.tsx
 import React, { useState } from 'react';
-import { Menu, Stethoscope, User } from 'lucide-react';
-import { AppHeader } from './ui/AppHeader'; // Tu componente móvil
-import { Sidebar } from './ui/sidebar';     // Tu sidebar de escritorio
-import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Menu, 
+  Search, 
+  Stethoscope, 
+  LogOut 
+} from 'lucide-react';
+import { SidebarProvider, SidebarInset, useSidebar } from "@/components/ui/sidebar";
+// Asegúrate de que estos archivos existan (los creamos en el paso anterior)
+import { AppSidebar } from "./AppSidebar";
+import { BottomNav } from "./BottomNav";
 import { useApp } from '@/state/AppContext';
-import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
-interface LayoutProps {
-  children: React.ReactNode;
-}
+// Componente Header Interno para poder usar el hook useSidebar
+const HeaderOriginal = () => {
+  const { toggleSidebar } = useSidebar(); // Hook para controlar el sidebar nuevo
+  const { currentUser, logout, setSearchQuery } = useApp();
+  const [searchInput, setSearchInput] = useState('');
+  const navigate = useNavigate();
 
-const Layout: React.FC<LayoutProps> = ({ children }) => {
-  // Estado para controlar el sidebar en Desktop
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const { currentUser } = useApp();
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchQuery(searchInput);
+    navigate('/pacientes');
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50/50 flex flex-col">
-      
-      {/* =========================================================
-          1. ZONA MÓVIL/TABLET (< 1024px)
-          Se encarga el AppHeader de todo.
-      ========================================================= */}
-      <AppHeader />
+    <header className="h-16 border-b border-border bg-card sticky top-0 z-40 flex items-center px-4 gap-4 w-full">
+      {/* Botón Menú: Solo visible en PC para colapsar/expandir el sidebar */}
+      <div className="hidden md:block">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleSidebar}
+          aria-label="Toggle sidebar"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      </div>
 
+      {/* Logo y Título (Visible siempre) */}
+      <div className="flex items-center gap-2">
+        <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+          <Stethoscope className="h-5 w-5 text-primary-foreground" />
+        </div>
+        <h1 className="text-lg font-semibold text-foreground">ClauDent</h1>
+      </div>
 
-      {/* =========================================================
-          2. ZONA ESCRITORIO (>= 1024px)
-          Header superior con botón de menú + Sidebar lateral
-      ========================================================= */}
-      
-      {/* Header Desktop (Solo visible en LG) */}
-      <header className="hidden lg:flex h-16 border-b border-border bg-card items-center justify-between px-6 fixed top-0 left-0 right-0 z-50">
-        <div className="flex items-center gap-4">
-          {/* Botón para Abrir/Cerrar Sidebar */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+      {/* TU BUSCADOR ORIGINAL (Visible siempre: Móvil y PC) */}
+      <form onSubmit={handleSearch} className="flex-1 max-w-md mx-auto">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Buscar pacientes..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="pl-10"
+            aria-label="Buscar pacientes"
+          />
+        </div>
+      </form>
 
-          {/* Logo Desktop */}
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-                <Stethoscope className="h-5 w-5" />
-            </div>
-            <span className="text-xl font-bold text-foreground">ClauDent</span>
-          </div>
+      {/* Usuario y Logout (Solo en PC) */}
+      <div className="hidden md:flex items-center gap-3">
+        <div className="text-right">
+          <p className="text-sm font-medium text-foreground">{currentUser?.email}</p>
+          <p className="text-xs text-muted-foreground">Dentista</p> 
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleLogout}
+          aria-label="Cerrar sesión"
+        >
+          <LogOut className="h-5 w-5" />
+        </Button>
+      </div>
+    </header>
+  );
+};
+
+// El Layout principal que envuelve toda la app
+const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return (
+    <SidebarProvider defaultOpen={true}>
+      {/* Sidebar: Solo visible en Desktop (md:block) */}
+      <div className="hidden md:block">
+        <AppSidebar />
+      </div>
+
+      {/* Contenedor Principal */}
+      <SidebarInset className="bg-background flex flex-col min-h-screen">
+        
+        {/* Tu Header Original */}
+        <HeaderOriginal />
+
+        {/* Contenido */}
+        <main className="flex-1 p-4 md:p-6 pb-24 md:pb-6 overflow-y-auto">
+           {children}
+        </main>
+
+        {/* Barra Inferior: Solo visible en Móvil (md:hidden) */}
+        <div className="md:hidden">
+          <BottomNav />
         </div>
 
-        {/* Info Usuario Desktop */}
-        <div className="flex items-center gap-3">
-            <div className="text-right">
-                <p className="text-sm font-medium">{currentUser?.email}</p>
-                <p className="text-xs text-muted-foreground">Dentista</p>
-            </div>
-            <div className="h-9 w-9 bg-secondary/20 rounded-full flex items-center justify-center text-primary">
-                <User className="h-5 w-5" />
-            </div>
-        </div>
-      </header>
-
-      {/* Sidebar Desktop (Controlado por sidebarOpen) */}
-      <aside 
-        className={cn(
-          "hidden lg:block fixed left-0 top-16 bottom-0 z-40 transition-all duration-300 ease-in-out border-r border-border bg-card overflow-hidden",
-          sidebarOpen ? "w-64" : "w-0 border-none"
-        )}
-      >
-        <Sidebar />
-      </aside>
-
-
-      {/* =========================================================
-          3. CONTENIDO PRINCIPAL (MAIN)
-          Se ajusta automáticamente
-      ========================================================= */}
-      <main 
-        className={cn(
-          "flex-1 w-full transition-all duration-300",
-          
-          /* MÓVIL: Padding para las barras AppHeader */
-          "pt-20 pb-24 px-4", 
-          
-          /* DESKTOP: Padding para el Header superior + Espacio del Sidebar */
-          "lg:pt-20 lg:pb-8 lg:px-8",
-          sidebarOpen ? "lg:pl-64" : "lg:pl-0"
-        )}
-      >
-        <div className="max-w-7xl mx-auto h-full">
-          {children}
-        </div>
-      </main>
-
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 };
 
