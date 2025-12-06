@@ -122,7 +122,7 @@ const Dashboard: React.FC = () => {
           </Link>
           <Link to="/servicios">
             <Button variant="outline" className="w-full h-24 flex flex-col gap-2">
-              <Stethoscope className="h-6 w-6" />
+              <img src="/logo.png" alt="ClauDent" className="h-12 object-contain mb-4" /> 
               <span className="text-sm">Ver Servicios</span>
             </Button>
           </Link>
