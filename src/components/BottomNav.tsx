@@ -18,7 +18,7 @@ export function BottomNav() {
     { title: "Inicio", url: "/dashboard", icon: Home },
     { title: "Pacientes", url: "/pacientes", icon: Users },
     { title: "Servicios", url: "/servicios", icon: Stethoscope },
-    { title: "Cotiza", url: "/cotizaciones", icon: FileText },
+    { title: "Cotizaciones", url: "/cotizaciones", icon: FileText },
   ];
 
   return (
@@ -54,4 +54,5 @@ export function BottomNav() {
       </button>
     </div>
   );
+
 }
