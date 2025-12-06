@@ -49,7 +49,7 @@ const HeaderOriginal = () => {
         <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
           <Stethoscope className="h-5 w-5 text-primary-foreground" />
         </div>
-        <h1 className="text-lg font-semibold text-foreground">ClauDent</h1>
+        <h1 className="text-lg font-semibold text-foreground hidden sm:block">ClauDent</h1>
       </div>
 
       <form onSubmit={handleSearch} className="flex-1 max-w-md mx-auto">
@@ -57,7 +57,7 @@ const HeaderOriginal = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Buscar pacientes..."
+            placeholder="Buscar..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="pl-10"
@@ -66,7 +66,6 @@ const HeaderOriginal = () => {
         </div>
       </form>
 
-      {/* Usuario y Logout (Solo en PC - lg:flex) */}
       <div className="hidden lg:flex items-center gap-3">
         <div className="text-right">
           <p className="text-sm font-medium text-foreground">{currentUser?.email}</p>
@@ -89,26 +88,24 @@ const HeaderOriginal = () => {
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <SidebarProvider defaultOpen={true}>
-      {/* 1. Sidebar: Solo visible en pantallas GRANDES (lg:block) */}
+      {/* 1. Sidebar: Solo visible en pantallas GRANDES */}
       <div className="hidden lg:block">
         <AppSidebar />
       </div>
 
       {/* 2. Contenido Principal */}
-      <SidebarInset className="bg-background flex flex-col min-h-screen">
+      {/* AGREGADO: overflow-x-hidden para evitar que tablas rompan el ancho */}
+      <SidebarInset className="bg-background flex flex-col min-h-screen w-full overflow-x-hidden">
         
         <HeaderOriginal />
 
-        {/* pb-24: Espacio extra abajo para que la barra no tape el contenido en móvil
-           lg:pb-6: Padding normal en PC
+        {/* AGREGADO: max-w-full para forzar a los hijos (tablas/grids) a respetar el ancho
         */}
-        <main className="flex-1 p-4 lg:p-6 pb-24 lg:pb-6 overflow-y-auto w-full">
-           {children}
+        <main className="flex-1 p-4 lg:p-6 pb-24 lg:pb-6 w-full max-w-full overflow-y-auto">
+            {children}
         </main>
 
-        {/* 3. Barra Inferior: AHORA ESTÁ DENTRO DEL CONTENIDO 
-           Visible solo en pantallas pequeñas y medianas (lg:hidden)
-        */}
+        {/* 3. Barra Inferior: Dentro del flujo pero solo móvil */}
         <div className="lg:hidden block">
           <BottomNav />
         </div>
