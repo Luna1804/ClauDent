@@ -69,7 +69,7 @@ const HeaderOriginal = () => {
       {/* Logo */}
       <div className="flex items-center gap-2">
         <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-          <Stethoscope className="h-5 w-5 text-primary-foreground" />
+          <img src="/logo.png" alt="ClauDent" className="h-12 object-contain mb-4" /> 
         </div>
         <h1 className="text-lg font-semibold text-foreground hidden sm:block">ClauDent</h1>
       </div>
@@ -149,7 +149,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <SidebarInset className="bg-background flex flex-col min-h-screen w-full overflow-x-hidden">
         <HeaderOriginal />
         <main className="flex-1 p-4 lg:p-6 pb-24 lg:pb-6 w-full max-w-full overflow-y-auto">
-           {children}
+            {children}
         </main>
         <div className="lg:hidden block">
           <BottomNav />
