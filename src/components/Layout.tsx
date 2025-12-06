@@ -67,10 +67,8 @@ const HeaderOriginal = () => {
       </div>
 
       {/* Logo */}
-      <div className="flex items-center gap-2">
-        <div className="h-8 w-8 rounded-lg  flex items-center justify-center">
-          <img src="/logo.png" alt="ClauDent" className="w-16 object-contain mb-4" /> 
-        </div>
+      <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="ClauDent Logo" className="w-16 object-contain rounded-md" />  
         <h1 className="text-lg font-semibold text-foreground hidden sm:block">ClauDent</h1>
       </div>
 
